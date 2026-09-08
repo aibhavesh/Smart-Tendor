@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "fastapi",
+  "functions": {
+    "index.py": {
+      "memory": 1024,
+      "maxDuration": 60,
+      "excludeFiles": "{tests/**,.venv/**,.qdrant/**,.storage/**,.env,.env.*,*.db,*.db-*,.pytest_cache/**,.mypy_cache/**,.ruff_cache/**}"
+    }
+  }
+}

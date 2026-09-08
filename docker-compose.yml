@@ -1,0 +1,79 @@
+name: tender-intel
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tender}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tender}
+      POSTGRES_DB: ${POSTGRES_DB:-tender_intel}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tender}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrantdata:/qdrant/storage
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    # Copy .env.backend.example -> backend/.env first. In containers, set
+    # DATABASE_URL host to `postgres` (see the template's note).
+    env_file: ./backend/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    ports:
+      - "8000:8000"
+    volumes:
+      - storage:/app/.storage
+
+  frontend:
+    # NEXT_PUBLIC_* is inlined by `next build`, so these must be *build args* — a runtime
+    # env_file would arrive too late and the image would ship the defaults instead.
+    # The API base is the nginx entrypoint (:8080/api), not backend:8000: the value is
+    # used by the browser, which cannot resolve a Compose service name.
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8080/api}
+        NEXT_PUBLIC_HERO_VIDEO: ${NEXT_PUBLIC_HERO_VIDEO:-/video/hero.mp4}
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+
+volumes:
+  pgdata:
+  qdrantdata:
+  storage:

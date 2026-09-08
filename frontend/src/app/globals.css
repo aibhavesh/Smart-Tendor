@@ -1,0 +1,255 @@
+@import "tailwindcss";
+
+/*
+ * ============================================================================
+ * THE TOKEN FILE — the only place in the frontend where a literal colour value
+ * may appear. Two lint rules enforce that (see eslint.config.mjs); CI fails on
+ * a violation anywhere under src/.
+ *
+ * Every value below was extracted from the realised landing page (plan §6.1),
+ * not designed in the abstract. If a token is not used by the landing page, it
+ * does not belong here.
+ *
+ * Font faces come from next/font/google in layout.tsx, which self-hosts them at
+ * build time. The --ff-* variables are its output; the @theme --font-* entries
+ * are the Tailwind-facing names, so the two must not collide.
+ * ============================================================================
+ */
+
+@theme {
+  /* --- Typeface -------------------------------------------------------- */
+  --font-sans: var(--ff-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-outfit: var(--ff-outfit), sans-serif;
+  --font-fustat: var(--ff-fustat), sans-serif;
+
+  /* --- Canvas and ink -------------------------------------------------- */
+  --color-canvas: #e5e4e2; /* page background */
+  --color-ink: #171717; /* body copy, and the neutral-900 the badges used */
+  --color-ink-strong: #000000; /* display headings */
+  /* Captions. Darkened from the neutral-500 the landing page used: measured, that
+     was 4.42:1 on glass and 3.73:1 on canvas — both below AA. This value clears AA
+     on both (5.27:1 glass, 4.59:1 canvas), so captions are no longer surface-bound. */
+  --color-ink-muted: #656565;
+  /* Glass surfaces — cards, drawers, floating badges. Light theme's glass is white
+     over the canvas; the dark theme lifts it *above* the canvas instead. Previously
+     these surfaces hard-coded `white`, which cannot follow a theme. */
+  --color-surface: #ffffff;
+
+  /* --- Brand ----------------------------------------------------------- */
+  --color-brand: #0084ff; /* primary actions, links, focus */
+  --color-brand-hover: #0074e0;
+  --color-brand-deep: #0066cc; /* gradient terminus; white on it 5.57:1 AA */
+  /* Brand as *text* on canvas. --color-brand itself is only 2.88:1 and must never
+     carry body-size copy; this is 5.28:1. Links, ghost-button labels, inline accents. */
+  --color-brand-ink: #005ab5;
+
+  /* --- Ambient (decorative only — never a text colour) ----------------- */
+  --color-sky-soft: #60b1ff;
+  --color-sky-vivid: #319aff;
+
+  /*
+   * Deliberately NOT tokenised: `sky-400/15` (aura disc), `blue-50` / `blue-100`
+   * (the ghost CTA's bead and border). Tailwind v4 ships its default palette in
+   * OKLCH, so hand-converting those to hex would shift them by an unknown amount
+   * and break the pixel-identity gate. They stay as palette utilities, which the
+   * lint rules permit — those rules forbid literals, and a palette name is not a
+   * literal. Revisit if the brand ever needs its own tint ramp.
+   */
+
+  /* --- Semantic states -------------------------------------------------
+   * GO / REVIEW / NO_BID per plan §7. `-ink` variants are for the colour used
+   * as text or an icon directly on --color-canvas; the base is for filled
+   * badges carrying white text. Both directions measured against AA.
+   */
+  /* White on --color-state-go is only 2.52:1 and FAILS AA — pair the vivid green
+     with --color-ink (6.98:1), or use --color-state-go-ink when white text is wanted. */
+  --color-state-go: #10b981;
+  --color-state-go-deep: #059669; /* gradient terminus */
+  --color-state-go-ink: #065f46; /* text on canvas 6.05:1 AA; white on it 7.69:1 AAA */
+  /* Danger, per the §6.4 decision. */
+  --color-state-danger: #dc2626; /* white on it 4.90:1 AA; on canvas only 3.86:1 */
+  --color-state-danger-ink: #b91c1c; /* text on canvas 5.09:1 AA; white on it 6.47:1 AA */
+  --color-accent-violet: #9333ea;
+  --color-accent-violet-deep: #7e22ce;
+
+  /* --- Type scale (px values the landing page actually uses) ------------ */
+  --text-nano: 9px;
+  --text-micro: 10px;
+  --text-mini: 11px;
+  --text-caption: 12px;
+  --text-label: 13px;
+  --text-ui: 14px;
+  --text-ui-lg: 15px;
+  --text-lead: 18px;
+  --text-wordmark: 22px;
+  --text-display-sm: 36px;
+  --text-display-md: 44px;
+  --text-display-lg: 60px;
+
+  /* --- Tracking and leading -------------------------------------------- */
+  --tracking-display: -3px;
+  --tracking-body: -0.5px;
+  --leading-display: 1.08;
+
+  /* --- Radii ------------------------------------------------------------ */
+  --radius-control: 12px; /* nav pill, drawer buttons */
+  --radius-tile: 14px; /* metric tiles */
+  --radius-surface: 16px; /* nav shell, primary CTA */
+  --radius-badge: 20px; /* floating glass badges */
+  --radius-panel: 24px; /* hero centrepiece */
+
+  /* --- Blur ------------------------------------------------------------- */
+  --blur-glass: 20px;
+  --blur-drawer: 40px;
+  --blur-aura-sm: 100px;
+  --blur-aura-md: 110px;
+  --blur-aura-lg: 120px;
+
+  /* --- Elevation --------------------------------------------------------
+   * The inset white highlight is the shared "refracted glass" signature; the
+   * coloured outer glow is what distinguishes each surface.
+   */
+  --shadow-glass: inset 0 2.5px 4px rgba(255, 255, 255, 0.8);
+  --shadow-cta: inset 0 4px 4px 0 rgba(255, 255, 255, 0.35),
+    0 10px 25px -5px rgba(0, 132, 255, 0.25);
+  --shadow-panel: inset 0 2.5px 4px rgba(255, 255, 255, 0.8),
+    0 24px 60px -12px rgba(0, 132, 255, 0.18);
+  --shadow-badge-brand: inset 0 2.5px 4px rgba(255, 255, 255, 0.8),
+    0 12px 32px -4px rgba(0, 132, 255, 0.12);
+  --shadow-badge-go: inset 0 2.5px 4px rgba(255, 255, 255, 0.8),
+    0 12px 32px -4px rgba(16, 185, 129, 0.12);
+  --shadow-badge-violet: inset 0 2.5px 4px rgba(255, 255, 255, 0.8),
+    0 12px 32px -4px rgba(147, 51, 234, 0.12);
+  --shadow-bead-brand: 0 4px 12px rgba(0, 132, 255, 0.3);
+  --shadow-bead-go: 0 4px 12px rgba(16, 185, 129, 0.3);
+  --shadow-bead-violet: 0 4px 12px rgba(147, 51, 234, 0.3);
+
+  /* --- Motion -----------------------------------------------------------
+   * Framer Motion needs these as JS numbers too — see src/lib/motion.ts, which
+   * is the single source for both. Keep the two in step.
+   */
+  --ease-entrance: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-quick: 200ms;
+  --duration-drawer: 300ms;
+  --duration-entrance: 600ms;
+  --duration-reveal: 900ms;
+}
+
+/*
+ * ============================================================================
+ * DARK THEME
+ *
+ * Tailwind v4 emits every @theme entry as a custom property on :root, and each
+ * utility references it as var(--color-…). Redefining those properties under a
+ * higher-specificity selector therefore re-themes every utility at once, with
+ * no component changes and no `dark:` variants to keep in sync.
+ *
+ * `html[data-theme="dark"]` is (0,1,1) against :root's (0,1,0), so it wins.
+ * The attribute is set by src/lib/theme.tsx and, before paint, by the inline
+ * script in layout.tsx.
+ *
+ * What flips: canvas, surface and the ink ramp invert. What does NOT: the brand
+ * and state *fills*, so a GO badge is the same green in both themes. Only the
+ * `-ink` variants — the ones used as text directly on the canvas — are relit,
+ * because a colour legible on #e5e4e2 is not legible on #101214.
+ * ============================================================================
+ */
+html[data-theme="dark"] {
+  /* --- Canvas and ink (inverted) --------------------------------------- */
+  --color-canvas: #101214;
+  --color-surface: #1b1f24;
+  --color-ink: #e6e7e9; /* body copy — 15.17:1 on canvas, 13.38:1 on surface */
+  --color-ink-strong: #ffffff; /* display headings */
+  --color-ink-muted: #9ba1a9; /* captions — 7.21:1 on canvas, 6.36:1 on surface; AA on both */
+
+  /* --- Brand -----------------------------------------------------------
+   * The fills stay put: white on --color-brand-hover / -deep was measured for
+   * AA and that does not change with the page behind it. Only brand-as-text is
+   * relit — #005ab5 is 1.4:1 on the dark canvas and would be unreadable.
+   */
+  --color-brand-ink: #6cb8ff; /* 8.88:1 on canvas */
+
+  /* --- Semantic states -------------------------------------------------
+   * Same reasoning: the badge fills are untouched, the on-canvas text colours
+   * are lifted out of the dark end of the ramp.
+   */
+  --color-state-go-ink: #34d399; /* 9.77:1 on canvas */
+  --color-state-danger-ink: #f87171; /* 6.79:1 on canvas */
+
+  /* --- Elevation -------------------------------------------------------
+   * The light theme's signature is an inset *white* highlight, which reads as a
+   * blown-out edge on a dark surface. Dark keeps the same geometry at a fraction
+   * of the opacity, and leans on a deeper outer shadow to separate the plane.
+   */
+  --shadow-glass: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --shadow-cta: inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 10px 25px -5px rgba(0, 0, 0, 0.55);
+  --shadow-panel: inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 24px 60px -12px rgba(0, 0, 0, 0.65);
+  --shadow-badge-brand: inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 12px 32px -4px rgba(0, 132, 255, 0.22);
+  --shadow-badge-go: inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 12px 32px -4px rgba(16, 185, 129, 0.22);
+  --shadow-badge-violet: inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 12px 32px -4px rgba(147, 51, 234, 0.22);
+}
+
+/* The browser's own widgets — scrollbars, form controls, the caret. */
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/*
+ * Root theme wrapper (plan §6.5): base surface, ink and typeface are inherited,
+ * so a new screen carries the identity by default and has to actively deviate
+ * to break it.
+ */
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+/* In-page nav anchors glide rather than jump — unless the reader opted out. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/*
+ * Theme change should read as a dip, not a jump-cut. Scoped to the properties
+ * that actually differ so it never fights a hover or an entrance animation, and
+ * dropped entirely for readers who asked for less motion.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  body,
+  header,
+  aside,
+  main {
+    transition: background-color var(--duration-quick) ease, color var(--duration-quick) ease;
+  }
+}
+
+/*
+ * The hero robot.
+ *
+ * The clip is a dark robot on a white backdrop. `multiply` is what drops that
+ * backdrop into the page — white multiplied by the canvas leaves the canvas.
+ * That works because the robot itself is dark and the canvas is light.
+ *
+ * On a dark canvas the same blend destroys it: dark robot x dark canvas is
+ * black on black. Inverting the clip's luminance first turns it into a light
+ * robot on a black backdrop, which `screen` then drops the same way — and the
+ * paired hue-rotate puts the hues back where they started, so the robot keeps
+ * its own colours instead of turning into its negative.
+ */
+.hero-robot {
+  filter: brightness(1.02) contrast(1.04);
+  mix-blend-mode: multiply;
+}
+
+html[data-theme="dark"] .hero-robot {
+  filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(1.05);
+  mix-blend-mode: screen;
+}

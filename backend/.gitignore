@@ -1,0 +1,42 @@
+# Environment and credentials
+.env
+.env.*
+!.env.example
+client_secret*.json
+*credentials*.json
+*.pem
+*.p12
+*.pfx
+
+# Python dependencies and generated output
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# Local application data
+.qdrant/
+.storage/
+*.db
+*.db-*
+*.sqlite*
+*.log
+.vercel/
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+.qdrant/
+.storage/
+tender_intel.db

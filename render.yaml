@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: tender-intel-api
+    runtime: docker
+    plan: free
+    region: singapore
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    maxShutdownDelaySeconds: 30
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ALLOW_ORIGINS
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ALLOWED_EMAIL_DOMAINS
+        sync: false
+      - key: ALLOWED_EMAIL_EXCEPTIONS
+        value: ""
+      - key: BOOTSTRAP_SUPER_ADMIN_EMAIL
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: EMBEDDING_BACKEND
+        value: hash
+      - key: WARM_EMBEDDINGS_ON_STARTUP
+        value: "false"
+      - key: ENABLE_DOCUMENT_WORKER
+        value: "true"
+      - key: METRICS_ENABLED
+        value: "false"
+      - key: JSON_LOGS
+        value: "true"

@@ -1,0 +1,9 @@
+# Shell scripts must keep LF endings whatever the checkout platform: a CR left
+# on the shebang line makes them unrunnable on Linux and in Git Bash
+# ("bad interpreter: /usr/bin/env bash^M").
+*.sh text eol=lf
+
+# PowerShell is Windows-side; CRLF matches the platform that runs it. Keep them
+# ASCII-only too — Windows PowerShell 5.1 reads .ps1 as ANSI, where a UTF-8
+# em dash decodes to a smart quote and terminates a string early.
+*.ps1 text eol=crlf

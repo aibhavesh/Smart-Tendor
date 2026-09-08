@@ -1,0 +1,84 @@
+# --- Secrets / environment ---
+.env
+.env.*
+# Keep the per-app templates tracked (real .env / .env.local stay ignored).
+!.env.example
+!.env.backend.example
+!.env.frontend.example
+
+# --- Credential files ---
+# The Google Cloud console hands you the OAuth client as a download named
+# `client_secret_<id>.apps.googleusercontent.com.json`. This project never needs the
+# secret — the backend verifies ID tokens against the *client id* alone, and
+# `google_client_secret` is declared in config but read nowhere (see
+# frontend/docs/google-sign-in.md). The file still lands in Downloads and gets copied
+# into repos by mistake, so it is ignored here regardless.
+client_secret*.json
+*client_secret*.json
+*-credentials.json
+credentials.json
+service-account*.json
+
+# Credentials pasted into a scratch note. A file literally named
+# "Google OAuth Client secret.txt" was sitting untracked in this repo root and would
+# otherwise have been swept into the first `git add -A`.
+*secret*.txt
+*Secret*.txt
+*credential*.txt
+*Credential*.txt
+
+# Private keys and certificates, wherever they end up.
+*.pem
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+.local-logs/
+
+# --- Runtime data (local) ---
+.qdrant/
+.storage/
+# SQLite file used when developing without a Postgres server.
+*.sqlite3
+tender_intel.db
+
+# The real role seed names actual people. Only the placeholder version is
+# tracked — see scripts/seed_role_assignments.example.sql.
+scripts/seed_role_assignments.sql
+
+# Screenshot output from a verification script invoked with an undefined
+# output directory.
+frontend/undefined/
+
+# --- Internal planning documents (deliberately not published) ---
+# The docs/ tree was purged from git history on 2026-08-21, not merely
+# untracked, and stays local. The root README is NOT excluded: it is the
+# project's public front page and is tracked.
+/docs/
+
+# --- Node / Next.js ---
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# --- Editor / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
