@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { UserPlus } from "lucide-react";
 import { RequireAuth } from "@/components/layout/RequireAuth";
+import { TenderRetirement } from "@/components/admin/TenderRetirement";
 import { Card, CardHeader, DataRow } from "@/components/ui/Card";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { ErrorState, SkeletonRows } from "@/components/ui/States";
@@ -219,6 +220,7 @@ function AdminBody() {
         <p className="text-ui text-ink-strong/60 mt-1.5">Accounts, health and usage.</p>
       </div>
       <UsersCard />
+      <TenderRetirement />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <HealthCard />
         <UsageCard />

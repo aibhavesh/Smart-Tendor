@@ -82,3 +82,5 @@ next-env.d.ts
 .idea/
 .DS_Store
 Thumbs.db
+.claude
+.claude/settings.json

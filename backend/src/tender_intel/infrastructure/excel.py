@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import io
 import re
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator, Mapping
 from typing import Any
 
 from openpyxl import load_workbook
@@ -89,7 +89,7 @@ def normalise_header(raw: object) -> str:
     return _PUNCT.sub(" ", str(raw).strip().lower()).strip()
 
 
-def resolve_header(raw: object) -> str:
+def resolve_header(raw: object, aliases: Mapping[str, str] = HEADER_ALIASES) -> str:
     """Map one spreadsheet heading onto a canonical field name.
 
     An unrecognised heading keeps its normalised form with spaces turned into
@@ -99,8 +99,8 @@ def resolve_header(raw: object) -> str:
     normalised = normalise_header(raw)
     if not normalised:
         return ""
-    if normalised in HEADER_ALIASES:
-        return HEADER_ALIASES[normalised]
+    if normalised in aliases:
+        return aliases[normalised]
     return normalised.replace(" ", "_")
 
 
@@ -118,7 +118,11 @@ def build_description(record: dict[str, Any]) -> str | None:
     return "\n".join(parts) if parts else None
 
 
-def parse_rows(content: bytes) -> Iterator[tuple[int, dict[str, Any]]]:
+def parse_rows(
+    content: bytes,
+    aliases: Mapping[str, str] = HEADER_ALIASES,
+    describe: Callable[[dict[str, Any]], str | None] = build_description,
+) -> Iterator[tuple[int, dict[str, Any]]]:
     workbook = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
     try:
         sheet = workbook.active
@@ -129,13 +133,13 @@ def parse_rows(content: bytes) -> Iterator[tuple[int, dict[str, Any]]]:
             header_row = next(rows)
         except StopIteration:
             return
-        headers = [resolve_header(h) for h in header_row]
+        headers = [resolve_header(h, aliases) for h in header_row]
         for offset, row in enumerate(rows, start=2):
             record = {
                 headers[i]: value for i, value in enumerate(row) if i < len(headers) and headers[i]
             }
             if any(v is not None and str(v).strip() for v in record.values()):
-                description = build_description(record)
+                description = describe(record)
                 if description:
                     record["description"] = description
                 yield offset, record

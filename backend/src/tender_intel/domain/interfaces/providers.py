@@ -38,6 +38,15 @@ class FileStorage(Protocol):
 
 
 @runtime_checkable
+class EmailSender(Protocol):
+    """Delivers one message. The domain never learns how."""
+
+    async def send(
+        self, *, to: list[str], subject: str, text_body: str, html_body: str | None = None
+    ) -> None: ...
+
+
+@runtime_checkable
 class EmbeddingProvider(Protocol):
     @property
     def dimension(self) -> int: ...

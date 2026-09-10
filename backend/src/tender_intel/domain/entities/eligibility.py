@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from tender_intel.domain.decision.eligibility import (
     EligibilityResult,
@@ -84,3 +84,23 @@ class TenderEligibility:
             "technical_pass": self.technical_pass,
             "rule_satisfied": self.rule_satisfied.value if self.rule_satisfied else None,
         }
+
+
+@dataclass(slots=True)
+class EligibilityNotification:
+    """One digest send, recorded so a tender is not notified twice.
+
+    Keyed on the eligibility result's ``inputs_fingerprint`` rather than the
+    tender alone. Re-screening unchanged inputs is silent; a result that
+    genuinely changed notifies again, because the second result is news.
+
+    ``recipients`` holds the addresses actually resolved at send time. The set
+    moves as roles change, so it is recorded rather than recomputed later.
+    """
+
+    tender_id: UUID
+    inputs_fingerprint: str
+    status: EligibilityStatus
+    recipients: list[str] = field(default_factory=list)
+    sent_at: datetime = field(default_factory=_now)
+    id: UUID = field(default_factory=uuid4)

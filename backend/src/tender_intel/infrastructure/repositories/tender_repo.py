@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from datetime import date
 from uuid import UUID
 
 from sqlalchemy import delete, func, or_, select
@@ -76,6 +78,29 @@ class SqlAlchemyTenderRepository:
             limit=page.limit,
             offset=page.offset,
         )
+
+    async def list_closing_before(self, cutoff: date, limit: int) -> Sequence[Tender]:
+        """Tenders with a KNOWN closing date strictly before ``cutoff``.
+
+        ``closing_date IS NOT NULL`` is stated explicitly rather than left to
+        three-valued logic. SQL would exclude nulls here anyway, but the
+        selection is destructive and the intent should be readable in the
+        query rather than inferred from the semantics of NULL comparison.
+        """
+        stmt = (
+            select(TenderModel)
+            .where(TenderModel.closing_date.is_not(None))
+            .where(TenderModel.closing_date < cutoff)
+            .order_by(TenderModel.closing_date.asc())
+            .limit(limit)
+        )
+        rows = (await self._session.execute(stmt)).scalars().all()
+        return [mappers.tender_to_domain(m) for m in rows]
+
+    async def count_unknown_closing_date(self) -> int:
+        """How many tenders a date filter can never reach."""
+        stmt = select(func.count(TenderModel.id)).where(TenderModel.closing_date.is_(None))
+        return int((await self._session.execute(stmt)).scalar_one())
 
     async def update(self, tender: Tender) -> Tender:
         model = await self._session.get(TenderModel, tender.id)

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { FolderKanban, Plus, RefreshCw } from "lucide-react";
+import { FileUp, FolderKanban, RefreshCw } from "lucide-react";
 import { RequireAuth } from "@/components/layout/RequireAuth";
+import { ProjectBulkImport } from "@/components/projects/ProjectBulkImport";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
@@ -18,82 +19,6 @@ import { formatDate, formatMoney } from "@/lib/format";
 import type { Page, PastProject } from "@/lib/types";
 
 const LIMIT = 20;
-
-function NewProject({ onCreated }: { onCreated: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [client, setClient] = useState("");
-  const [value, setValue] = useState("");
-  const [completion, setCompletion] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      await api.post<PastProject>("/projects", {
-        name,
-        client: client || null,
-        work_value: value || null,
-        completion_date: completion || null,
-      });
-      setName("");
-      setClient("");
-      setValue("");
-      setCompletion("");
-      setOpen(false);
-      onCreated();
-    } catch (err) {
-      setError(describeError(err, { 422: "Check the values — work value must not be negative." }));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  if (!open) {
-    return (
-      <Button size="sm" onClick={() => setOpen(true)}>
-        <Plus className="w-3.5 h-3.5" aria-hidden="true" />
-        Add project
-      </Button>
-    );
-  }
-
-  return (
-    <form onSubmit={submit} className="flex flex-col gap-3 w-full">
-      {error ? (
-        <p
-          role="alert"
-          className="rounded-control bg-state-danger/10 border border-state-danger/30 px-3 py-2 text-caption font-semibold text-state-danger-ink"
-        >
-          {error}
-        </p>
-      ) : null}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <TextField label="Name" required maxLength={1024} value={name} onChange={(e) => setName(e.target.value)} />
-        <TextField label="Client" value={client} onChange={(e) => setClient(e.target.value)} />
-        <TextField
-          label="Work value"
-          inputMode="decimal"
-          helper="Kept as a decimal string — never rounded."
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-        />
-        <DateField label="Completion date" value={completion} onChange={(e) => setCompletion(e.target.value)} />
-      </div>
-      <div className="flex items-center gap-2">
-        <Button type="submit" size="sm" disabled={busy}>
-          {busy ? "Saving…" : "Save project"}
-        </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
-          Cancel
-        </Button>
-      </div>
-    </form>
-  );
-}
 
 function EditProject({
   project,
@@ -170,6 +95,7 @@ function ProjectsBody() {
   const isAdmin = canActAs(user?.role, "ADMIN");
 
   const [offset, setOffset] = useState(0);
+  const [importing, setImporting] = useState(false);
   const [backfill, setBackfill] = useState<string | null>(null);
   const [editing, setEditing] = useState<PastProject | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
@@ -210,9 +136,21 @@ function ProjectsBody() {
               Backfill index
             </Button>
           ) : null}
-          {canWrite ? <NewProject onCreated={page.reload} /> : null}
+          {canWrite ? (
+            <Button size="sm" onClick={() => setImporting((v) => !v)}>
+              <FileUp className="w-3.5 h-3.5" aria-hidden="true" />
+              Bulk import
+            </Button>
+          ) : null}
         </div>
       </div>
+
+      {canWrite && importing ? (
+        <ProjectBulkImport
+          onImported={page.reload}
+          onClose={() => setImporting(false)}
+        />
+      ) : null}
 
       {backfill ? (
         <p
@@ -252,7 +190,7 @@ function ProjectsBody() {
         ) : page.data.items.length === 0 ? (
           <EmptyState
             title="No past projects yet"
-            description="Qualification checks need a portfolio to match against."
+            description="Eligibility checks need a portfolio to match against. Use Bulk import to load them from the portfolio workbook or from completion certificates."
             icon={FolderKanban}
           />
         ) : (

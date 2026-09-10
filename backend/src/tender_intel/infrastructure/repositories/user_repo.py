@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tender_intel.domain.entities import User, UserSession
+from tender_intel.domain.enums.roles import UserRole
 from tender_intel.domain.value_objects.pagination import Page, PageRequest
 from tender_intel.infrastructure.db.orm import UserModel, UserSessionModel
 from tender_intel.infrastructure.repositories import mappers
@@ -53,6 +55,22 @@ class SqlAlchemyUserRepository:
             limit=page.limit,
             offset=page.offset,
         )
+
+    async def list_active_with_exact_role(self, role: UserRole) -> Sequence[User]:
+        """Active users holding EXACTLY this role.
+
+        Equality, never a level comparison. The role hierarchy is otherwise
+        inclusive-upward, so ``level >= 30`` would silently pull ADMIN and
+        SUPER_ADMIN into a recipient set meant for MANAGER alone.
+        """
+        stmt = (
+            select(UserModel)
+            .where(UserModel.role == role.value)
+            .where(UserModel.is_active.is_(True))
+            .order_by(UserModel.email.asc())
+        )
+        rows = (await self._session.execute(stmt)).scalars().all()
+        return [mappers.user_to_domain(m) for m in rows]
 
     async def update(self, user: User) -> User:
         model = await self._session.get(UserModel, user.id)

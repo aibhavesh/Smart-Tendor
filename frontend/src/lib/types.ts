@@ -130,6 +130,87 @@ export interface BulkImportResult {
   }[];
 }
 
+/**
+ * Bulk past-project import.
+ *
+ * Nests one level deeper than the tender import: a batch holds files, and a
+ * file holds rows, because one uploaded workbook can carry many projects.
+ */
+export interface ProjectImportRow {
+  row: number;
+  name: string | null;
+  outcome: string;
+  message: string | null;
+  project_id: string | null;
+  work_types_linked: number;
+  /** False when the eligibility engine will not count this project as evidence. */
+  eligibility_visible: boolean;
+  /** Which of work_value, completion_certificate_date, work_type_link is absent. */
+  missing_for_eligibility: string[];
+}
+
+export interface ProjectImportFile {
+  filename: string;
+  outcome: string;
+  message: string | null;
+  created: number;
+  skipped: number;
+  errors: number;
+  rows: ProjectImportRow[];
+}
+
+export interface ProjectImportResult {
+  created: number;
+  skipped: number;
+  errors: number;
+  files_failed: number;
+  work_types_linked: number;
+  eligibility_visible: number;
+  files: ProjectImportFile[];
+}
+
+/**
+ * Bulk retirement of expired tenders.
+ *
+ * Retirement purges the stored PDF and keeps the record: the tender row, its
+ * metadata, BOQ items, reviews and eligibility result all survive.
+ */
+export interface RetirementCandidate {
+  tender_id: string;
+  tender_number: string;
+  title: string;
+  status: string;
+  closing_date: string | null;
+  documents_to_purge: number;
+  bytes_to_reclaim: number;
+  retirable: boolean;
+  /** Why this tender is in the window but will not be retired. */
+  skip_reason: string | null;
+}
+
+export interface RetirementPreview {
+  cutoff: string;
+  timezone: string;
+  retirable_count: number;
+  skipped_count: number;
+  documents_to_purge: number;
+  bytes_to_reclaim: number;
+  /** Tenders no date filter can reach, because their closing date is unknown. */
+  unknown_closing_date: number;
+  truncated: boolean;
+  candidates: RetirementCandidate[];
+}
+
+export interface RetirementResult {
+  cutoff: string;
+  timezone: string;
+  tenders_archived: number;
+  documents_purged: number;
+  bytes_reclaimed: number;
+  failures: string[];
+  retained: string;
+}
+
 export interface TenderDocument {
   id: string;
   tender_id: string;

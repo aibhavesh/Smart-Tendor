@@ -27,6 +27,7 @@ class TenderDocument:
     last_error: str | None = None
     downloaded_at: datetime | None = None
     raw_text: str | None = None
+    purged_at: datetime | None = None
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=_now)
     updated_at: datetime = field(default_factory=_now)
@@ -48,6 +49,24 @@ class TenderDocument:
         self.last_error = None
         self.downloaded_at = _now()
         self.updated_at = _now()
+
+    def mark_purged(self) -> None:
+        """Record that the stored bytes were reclaimed.
+
+        Clears ``file_path`` because the file is gone, and keeps ``sha256``,
+        ``file_size``, ``file_name``, ``source_url`` and ``raw_text`` — the
+        evidence of what the document was and what was extracted from it.
+        The status stays DOWNLOADED: the document *was* downloaded, and
+        rewriting history to say otherwise would invite the worker to fetch
+        it again.
+        """
+        self.file_path = None
+        self.purged_at = _now()
+        self.updated_at = _now()
+
+    @property
+    def is_purged(self) -> bool:
+        return self.purged_at is not None
 
     def mark_failed(self, error: str) -> None:
         self.status = DocumentStatus.FAILED

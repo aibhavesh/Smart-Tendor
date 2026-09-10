@@ -111,6 +111,21 @@ class Settings(BaseSettings):
     download_poll_seconds: int = 15
     enable_document_worker: bool = True
 
+    # --- Email notification (eligibility digest) ---
+    # Every value comes from the environment. There is no default host, so an
+    # unconfigured deployment sends nothing rather than silently trying
+    # localhost:25 and reporting success.
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_use_tls: bool = True
+    smtp_timeout_seconds: int = 20
+    # The From address. Recipients are never configured here: they are
+    # resolved from the user table at send time, by role.
+    notification_from_email: str | None = None
+    notification_enabled: bool = True
+
     # --- Extraction ---
     extraction_text_backend: str = "pdfplumber"  # or "pymupdf"
 

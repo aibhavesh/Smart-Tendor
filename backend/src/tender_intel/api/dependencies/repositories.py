@@ -9,6 +9,7 @@ from tender_intel.api.dependencies.db import get_session
 from tender_intel.infrastructure.repositories.audit_repo import SqlAlchemyAuditLogRepository
 from tender_intel.infrastructure.repositories.eligibility_repo import (
     SqlAlchemyCompanyTurnoverRepository,
+    SqlAlchemyEligibilityNotificationRepository,
     SqlAlchemyPortfolioVersionRepository,
     SqlAlchemyTenderEligibilityRepository,
 )
@@ -99,6 +100,12 @@ def get_turnover_repo(
     session: AsyncSession = Depends(get_session),
 ) -> SqlAlchemyCompanyTurnoverRepository:
     return SqlAlchemyCompanyTurnoverRepository(session)
+
+
+def get_notification_repo(
+    session: AsyncSession = Depends(get_session),
+) -> SqlAlchemyEligibilityNotificationRepository:
+    return SqlAlchemyEligibilityNotificationRepository(session)
 
 
 def get_eligibility_repo(

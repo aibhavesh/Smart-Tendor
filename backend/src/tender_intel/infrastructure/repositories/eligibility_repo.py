@@ -15,10 +15,14 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tender_intel.domain.entities.company_turnover import CompanyTurnover
-from tender_intel.domain.entities.eligibility import TenderEligibility
+from tender_intel.domain.entities.eligibility import (
+    EligibilityNotification,
+    TenderEligibility,
+)
 from tender_intel.domain.value_objects.pagination import Page, PageRequest
 from tender_intel.infrastructure.db.orm import (
     CompanyTurnoverModel,
+    EligibilityNotificationModel,
     PastProjectModel,
     PortfolioVersionModel,
     TenderEligibilityModel,
@@ -224,3 +228,33 @@ class SqlAlchemyPortfolioVersionRepository:
             model.updated_at = datetime.now(UTC)
         await self._session.flush()
         return int(model.counter)
+
+
+class SqlAlchemyEligibilityNotificationRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def add(self, entry: EligibilityNotification) -> EligibilityNotification:
+        model = EligibilityNotificationModel(
+            id=entry.id,
+            tender_id=entry.tender_id,
+            inputs_fingerprint=entry.inputs_fingerprint,
+            status=entry.status.value,
+            recipients=list(entry.recipients),
+            sent_at=entry.sent_at,
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return entry
+
+    async def was_notified(self, tender_id: UUID, fingerprint: str) -> bool:
+        """Has this exact result already been sent?
+
+        Keyed on the fingerprint, so re-screening unchanged inputs is silent
+        while a genuinely changed result notifies again.
+        """
+        stmt = select(EligibilityNotificationModel.id).where(
+            EligibilityNotificationModel.tender_id == tender_id,
+            EligibilityNotificationModel.inputs_fingerprint == fingerprint,
+        )
+        return (await self._session.execute(stmt)).first() is not None

@@ -20,6 +20,7 @@ from tender_intel.api.dependencies.repositories import (
     get_audit_repo,
     get_boq_repo,
     get_eligibility_repo,
+    get_notification_repo,
     get_past_project_repo,
     get_portfolio_version_repo,
     get_role_assignment_repo,
@@ -42,8 +43,13 @@ from tender_intel.application.services.document_service import DocumentService
 from tender_intel.application.services.eligibility_service import EligibilityService
 from tender_intel.application.services.extraction_service import ExtractionService
 from tender_intel.application.services.matching_service import MatchingService
+from tender_intel.application.services.notification_service import (
+    EligibilityNotificationService,
+)
 from tender_intel.application.services.past_project_service import PastProjectService
 from tender_intel.application.services.platform_service import PlatformService
+from tender_intel.application.services.project_import_service import ProjectImportService
+from tender_intel.application.services.retirement_service import TenderRetirementService
 from tender_intel.application.services.review_service import ReviewService
 from tender_intel.application.services.tender_service import TenderService
 from tender_intel.application.services.work_type_service import WorkTypeService
@@ -55,11 +61,13 @@ from tender_intel.domain.interfaces.providers import (
     VectorStore,
 )
 from tender_intel.infrastructure.downloader import HttpxDownloader
+from tender_intel.infrastructure.email import SmtpEmailSender
 from tender_intel.infrastructure.extraction.pdf_backends import PdfPlumberBOQExtractor
 from tender_intel.infrastructure.extraction.rule_metadata import RuleBasedMetadataExtractor
 from tender_intel.infrastructure.repositories.audit_repo import SqlAlchemyAuditLogRepository
 from tender_intel.infrastructure.repositories.eligibility_repo import (
     SqlAlchemyCompanyTurnoverRepository,
+    SqlAlchemyEligibilityNotificationRepository,
     SqlAlchemyPortfolioVersionRepository,
     SqlAlchemyTenderEligibilityRepository,
 )
@@ -239,6 +247,52 @@ def get_work_type_service(
 ) -> WorkTypeService:
     return WorkTypeService(
         work_types=work_types, projects=projects, versions=versions, audits=audits
+    )
+
+
+def get_project_import_service(
+    projects: PastProjectService = Depends(get_past_project_service),
+    work_types: WorkTypeService = Depends(get_work_type_service),
+    work_type_repo: SqlAlchemyWorkTypeRepository = Depends(get_work_type_repo),
+    project_repo: SqlAlchemyPastProjectRepository = Depends(get_past_project_repo),
+    audits: SqlAlchemyAuditLogRepository = Depends(get_audit_repo),
+) -> ProjectImportService:
+    return ProjectImportService(
+        projects=projects,
+        work_types=work_types,
+        work_type_repo=work_type_repo,
+        project_repo=project_repo,
+        audits=audits,
+    )
+
+
+def get_notification_service(
+    tenders: SqlAlchemyTenderRepository = Depends(get_tender_repo),
+    results: SqlAlchemyTenderEligibilityRepository = Depends(get_eligibility_repo),
+    notifications: SqlAlchemyEligibilityNotificationRepository = Depends(get_notification_repo),
+    users: SqlAlchemyUserRepository = Depends(get_user_repo),
+    audits: SqlAlchemyAuditLogRepository = Depends(get_audit_repo),
+    settings: Settings = Depends(get_app_settings),
+) -> EligibilityNotificationService:
+    return EligibilityNotificationService(
+        tenders=tenders,
+        results=results,
+        notifications=notifications,
+        users=users,
+        sender=SmtpEmailSender(settings),
+        audits=audits,
+        enabled=settings.notification_enabled,
+    )
+
+
+def get_retirement_service(
+    tenders: SqlAlchemyTenderRepository = Depends(get_tender_repo),
+    documents: SqlAlchemyTenderDocumentRepository = Depends(get_tender_document_repo),
+    storage: LocalFileStorage = Depends(get_storage),
+    audits: SqlAlchemyAuditLogRepository = Depends(get_audit_repo),
+) -> TenderRetirementService:
+    return TenderRetirementService(
+        tenders=tenders, documents=documents, storage=storage, audits=audits
     )
 
 

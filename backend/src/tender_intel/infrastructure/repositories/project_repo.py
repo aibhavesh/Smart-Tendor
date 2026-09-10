@@ -37,6 +37,13 @@ class SqlAlchemyPastProjectRepository:
         rows = (await self._session.execute(stmt)).scalars().all()
         return [mappers.past_project_to_domain(m) for m in rows]
 
+    async def find_by_loa_reference(self, normalised: str) -> PastProject | None:
+        stmt = select(PastProjectModel).where(
+            PastProjectModel.loa_reference_normalised == normalised
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return mappers.past_project_to_domain(model) if model else None
+
     async def list(self, page: PageRequest) -> Page[PastProject]:
         total = (await self._session.execute(select(func.count(PastProjectModel.id)))).scalar_one()
         stmt = (

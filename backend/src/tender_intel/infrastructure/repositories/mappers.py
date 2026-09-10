@@ -220,6 +220,7 @@ def document_to_domain(m: TenderDocumentModel) -> TenderDocument:
         last_error=m.last_error,
         downloaded_at=m.downloaded_at,
         raw_text=m.raw_text,
+        purged_at=m.purged_at,
         created_at=m.created_at,
         updated_at=m.updated_at,
     )
@@ -238,6 +239,7 @@ def document_apply(m: TenderDocumentModel, e: TenderDocument) -> None:
     m.last_error = e.last_error
     m.downloaded_at = e.downloaded_at
     m.raw_text = e.raw_text
+    m.purged_at = e.purged_at
 
 
 def document_to_model(e: TenderDocument) -> TenderDocumentModel:

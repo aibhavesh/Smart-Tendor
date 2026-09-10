@@ -23,8 +23,11 @@ from tender_intel.api.routers import (
     health,
     matching,
     metrics,
+    notifications,
     observability,
+    project_import,
     projects,
+    retirement,
     reviews,
     stats,
     tenders,
@@ -99,6 +102,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(documents.router)
     app.include_router(extraction.router)
     app.include_router(projects.router)
+    app.include_router(project_import.router)
+    app.include_router(retirement.router)
+    app.include_router(notifications.router)
     app.include_router(matching.router)
     app.include_router(decisions.router)
     app.include_router(analyst.router)

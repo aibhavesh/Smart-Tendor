@@ -28,6 +28,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     Uuid,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -122,6 +123,10 @@ class TenderDocumentModel(TimestampMixin, Base):
     attempt_count: Mapped[int] = mapped_column(Integer, default=0)
     last_error: Mapped[str | None] = mapped_column(Text)
     downloaded_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # Set when the stored bytes were deliberately reclaimed by tender
+    # retirement. Distinguishes a purged document from one never downloaded,
+    # both of which have a null file_path.
+    purged_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     raw_text: Mapped[str | None] = mapped_column(Text)
 
     tender: Mapped[TenderModel] = relationship(back_populates="documents")
@@ -284,6 +289,32 @@ class CompanyTurnoverModel(Base):
         ForeignKey("users.id", ondelete="SET NULL"), index=True
     )
     recorded_at: Mapped[datetime] = mapped_column(UTCDateTime)
+
+
+class EligibilityNotificationModel(Base):
+    """One digest send, recorded so a tender is not notified twice.
+
+    Unique on ``(tender_id, inputs_fingerprint)``: re-screening unchanged
+    inputs is silent, while a genuinely changed result notifies again.
+    """
+
+    __tablename__ = "eligibility_notifications"
+    __table_args__ = (
+        UniqueConstraint(
+            "tender_id", "inputs_fingerprint", name="uq_eligibility_notification_inputs"
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    tender_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("tenders.id", ondelete="CASCADE"), index=True
+    )
+    inputs_fingerprint: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(32))
+    #: The addresses actually resolved at send time. The recipient set moves
+    #: as roles change, so the list is recorded rather than recomputed later.
+    recipients: Mapped[list[str]] = mapped_column(JSON, default=list)
+    sent_at: Mapped[datetime] = mapped_column(UTCDateTime)
 
 
 class TenderEligibilityModel(Base):
