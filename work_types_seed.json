@@ -1,0 +1,505 @@
+{
+  "$comment": "Work-type taxonomy seeded from 7_YEAR_PROJECT_DETAILS.xlsx (32 projects, row 34 excluded - empty description). Categories: TELECOM_NETWORKING, SIGNALLING, AUDIO_VISUAL. project_loa values are the LOA Name column verbatim and must be reconciled against past_projects.loa_reference at load time.",
+  "version": "1.0",
+  "source": "7_YEAR_PROJECT_DETAILS.xlsx",
+  "categories": [
+    { "code": "TELECOM_NETWORKING", "name": "Telecom, Networking, OFC, Quad Cable and Data Equipment" },
+    { "code": "SIGNALLING", "name": "Signalling Work" },
+    { "code": "AUDIO_VISUAL", "name": "Audio Video Systems" }
+  ],
+  "work_types": [
+    {
+      "code": "OFC_TRENCHING_EXCAVATION",
+      "name": "Trenching and excavation for cable laying",
+      "category": "TELECOM_NETWORKING",
+      "description": "Preparation of trenches and excavation works preparatory to underground cable laying.",
+      "aliases": [
+        { "alias": "preparation of trenches", "kind": "VARIANT" },
+        { "alias": "excavation of trenches", "kind": "VARIANT" },
+        { "alias": "trenching", "kind": "SYNONYM" }
+      ],
+      "projects": ["TELE 22", "TELE 24", "TELE 08", "ADI_TELE 16_2.54 CR", "ADI_Tele-05_61LC _MIDDLE", "ADI_Tele-07_1.13CR", "NOFN", "ADI_TELE 05_OLD_2.12", "RLDA-2.95 Cr."]
+    },
+    {
+      "code": "CABLE_LAYING_JOINTING_BACKFILLING",
+      "name": "Laying, jointing and backfilling of underground cable",
+      "category": "TELECOM_NETWORKING",
+      "description": "Laying of underground cable in prepared trenches followed by jointing and backfilling.",
+      "aliases": [
+        { "alias": "laying and jointing", "kind": "VARIANT" },
+        { "alias": "laying backfilling and jointing", "kind": "VARIANT" },
+        { "alias": "backfilling", "kind": "SYNONYM" }
+      ],
+      "projects": ["TELE 24", "ADI_TELE 16_2.54 CR", "ADI_Tele-05_61LC _MIDDLE", "ADI_Tele-07_1.13CR", "RLDA-2.95 Cr."]
+    },
+    {
+      "code": "DUCT_LAYING_OFC_BLOWING",
+      "name": "Duct laying and blowing of OFC through ducts",
+      "category": "TELECOM_NETWORKING",
+      "description": "Laying of duct and pneumatic blowing of optical fibre cable through the installed duct.",
+      "aliases": [
+        { "alias": "laying duct", "kind": "VARIANT" },
+        { "alias": "blowing of OFC through ducts", "kind": "VARIANT" },
+        { "alias": "cable blowing", "kind": "SYNONYM" }
+      ],
+      "projects": ["Mumbai", "NOFN"]
+    },
+    {
+      "code": "OVERHEAD_OFC_LAYING",
+      "name": "Overhead OFC laying and pulling",
+      "category": "TELECOM_NETWORKING",
+      "description": "Pulling and laying of optical fibre cable on overhead routes as distinct from underground.",
+      "aliases": [
+        { "alias": "pulling of O/H cable", "kind": "VARIANT" },
+        { "alias": "over head laying", "kind": "VARIANT" },
+        { "alias": "aerial OFC", "kind": "SYNONYM" }
+      ],
+      "projects": ["NOFN"]
+    },
+    {
+      "code": "OFC_SPLICING_TERMINATION_TESTING",
+      "name": "Splicing, termination and testing of OFC",
+      "category": "TELECOM_NETWORKING",
+      "description": "Fusion splicing, termination and end-to-end testing of optical fibre cable routes.",
+      "aliases": [
+        { "alias": "splicing", "kind": "SYNONYM" },
+        { "alias": "splicing and testing", "kind": "VARIANT" },
+        { "alias": "jointing termination testing", "kind": "VARIANT" }
+      ],
+      "projects": ["BRC_94R_1.76CR", "Mumbai", "RLDA-2.95 Cr."]
+    },
+    {
+      "code": "CABLE_SHIFTING_RESTORATION",
+      "name": "Cable tracing, securing, shifting and restoration",
+      "category": "TELECOM_NETWORKING",
+      "description": "Tracing and securing of buried S&T cable, OFC and location boxes, and shifting or restoration to remove infringement during civil works.",
+      "aliases": [
+        { "alias": "tracing securing shifting", "kind": "VARIANT" },
+        { "alias": "cable shifting", "kind": "SYNONYM" },
+        { "alias": "removing infringement", "kind": "VARIANT" },
+        { "alias": "location box shifting", "kind": "VARIANT" }
+      ],
+      "projects": ["BRC-SHIFTING_BRC 1.37 Cr."]
+    },
+    {
+      "code": "UTILITIES_RELOCATION",
+      "name": "Telecommunication utilities relocation",
+      "category": "TELECOM_NETWORKING",
+      "description": "Relocation of telecommunication utilities in connection with station redevelopment or realignment works.",
+      "aliases": [
+        { "alias": "utilities relocation", "kind": "SYNONYM" },
+        { "alias": "telecommunication utilities relocation work", "kind": "VARIANT" }
+      ],
+      "projects": ["RLDA-2.95 Cr."]
+    },
+    {
+      "code": "OFC_MAINTENANCE",
+      "name": "OFC maintenance, underground and overhead",
+      "category": "TELECOM_NETWORKING",
+      "description": "Ongoing maintenance of underground and overhead optical fibre cable routes post-commissioning.",
+      "aliases": [
+        { "alias": "maintenance of OFC", "kind": "VARIANT" },
+        { "alias": "OFC AMC", "kind": "SYNONYM" }
+      ],
+      "projects": ["NOFN"]
+    },
+    {
+      "code": "OFC_CABLE_SUPPLY",
+      "name": "Optical fibre cable supply and installation",
+      "category": "TELECOM_NETWORKING",
+      "description": "Supply and installation of optical fibre cable, including 24-fibre and 48-fibre variants.",
+      "aliases": [
+        { "alias": "OFC", "kind": "ABBREVIATION" },
+        { "alias": "optical fibre cable", "kind": "EXPANSION" },
+        { "alias": "optic fiber cable", "kind": "VARIANT" },
+        { "alias": "24 fiber OFC", "kind": "VARIANT" },
+        { "alias": "48F OFC", "kind": "VARIANT" }
+      ],
+      "projects": ["TELE 22", "TELE 08", "BRC_94R_1.76CR", "MUMBAI SURAT-OFC _2.91CR", "ADI_Tele-05_61LC _MIDDLE", "ADI_Tele-07_1.13CR", "Mumbai", "NOFN", "ADI_TELE 05_OLD_2.12", "RLDA-2.95 Cr."]
+    },
+    {
+      "code": "PIJF_CABLE",
+      "name": "PIJF cable supply and installation",
+      "category": "TELECOM_NETWORKING",
+      "description": "Supply, laying and jointing of Paper Insulated Jelly Filled underground telecom cable.",
+      "aliases": [
+        { "alias": "PIJF", "kind": "ABBREVIATION" },
+        { "alias": "paper insulated jelly filled", "kind": "EXPANSION" },
+        { "alias": "PIJF cable", "kind": "VARIANT" }
+      ],
+      "projects": ["TELE 22", "TELE 24", "TELE 08", "ADI_TELE 16_2.54 CR", "ADI_Tele-05_61LC _MIDDLE", "ADI_TELE 05_OLD_2.12", "RLDA-2.95 Cr."]
+    },
+    {
+      "code": "QUAD_CABLE",
+      "name": "Quad cable supply and installation",
+      "category": "TELECOM_NETWORKING",
+      "description": "Supply, laying and jointing of quad telecom cable, including 6-quad variants.",
+      "aliases": [
+        { "alias": "quad cable", "kind": "SYNONYM" },
+        { "alias": "6 quad", "kind": "VARIANT" },
+        { "alias": "quad", "kind": "VARIANT" }
+      ],
+      "projects": ["TELE 24", "ADI_TELE 16_2.54 CR", "BRC_94R_1.76CR", "ADI_Tele-05_61LC _MIDDLE", "ADI_Tele-07_1.13CR", "RLDA-2.95 Cr."]
+    },
+    {
+      "code": "SDH_STM_ADM",
+      "name": "SDH transmission equipment (STM-1 / STM-4, Add-Drop Mux)",
+      "category": "TELECOM_NETWORKING",
+      "description": "Supply, installation, testing and commissioning of SDH transmission equipment including STM-1 and STM-4 nodes and Add/Drop Multiplexers.",
+      "aliases": [
+        { "alias": "SDH", "kind": "ABBREVIATION" },
+        { "alias": "synchronous digital hierarchy", "kind": "EXPANSION" },
+        { "alias": "STM-1", "kind": "VARIANT" },
+        { "alias": "STM-4", "kind": "VARIANT" },
+        { "alias": "add drop mux", "kind": "SYNONYM" },
+        { "alias": "ADM", "kind": "ABBREVIATION" }
+      ],
+      "projects": ["TELE 22", "TELE 24"]
+    },
+    {
+      "code": "PMUX_DSLAM",
+      "name": "PMUX and DSLAM equipment",
+      "category": "TELECOM_NETWORKING",
+      "description": "Supply, installation and commissioning of primary multiplexer and DSLAM access equipment.",
+      "aliases": [
+        { "alias": "PMUX", "kind": "ABBREVIATION" },
+        { "alias": "primary multiplexer", "kind": "EXPANSION" },
+        { "alias": "DSLAM", "kind": "ABBREVIATION" },
+        { "alias": "digital subscriber line access multiplexer", "kind": "EXPANSION" }
+      ],
+      "projects": ["TELE 24"]
+    },
+    {
+      "code": "DIGITAL_EXCHANGE",
+      "name": "Digital electronic exchange",
+      "category": "TELECOM_NETWORKING",
+      "description": "Supply, installation and commissioning of digital electronic telephone exchange systems.",
+      "aliases": [
+        { "alias": "digital electronic exchange", "kind": "VARIANT" },
+        { "alias": "electronic exchange", "kind": "SYNONYM" },
+        { "alias": "EPABX", "kind": "SYNONYM" },
+        { "alias": "exchange", "kind": "VARIANT" }
+      ],
+      "projects": ["TELE 24", "BRC_94R_1.76CR", "ADI_TELE 05_OLD_2.12"]
+    },
+    {
+      "code": "FDMS",
+      "name": "FDMS installation and commissioning",
+      "category": "TELECOM_NETWORKING",
+      "description": "Supply of material, installation, testing and commissioning of Fibre Distribution Management System.",
+      "aliases": [
+        { "alias": "FDMS", "kind": "ABBREVIATION" },
+        { "alias": "fibre distribution management system", "kind": "EXPANSION" }
+      ],
+      "projects": ["TELE 08"]
+    },
+    {
+      "code": "EC_SOCKETS",
+      "name": "EC socket provision",
+      "category": "TELECOM_NETWORKING",
+      "description": "Supply, installation, testing and commissioning of emergency communication sockets along track sections.",
+      "aliases": [
+        { "alias": "EC socket", "kind": "SYNONYM" },
+        { "alias": "emergency communication socket", "kind": "EXPANSION" }
+      ],
+      "projects": ["ADI_TELE 16_2.54 CR"]
+    },
+    {
+      "code": "OFC_SYSTEM_DESIGN",
+      "name": "OFC communication system design and commissioning",
+      "category": "TELECOM_NETWORKING",
+      "description": "End-to-end system design and commissioning of OFC-based digital communication systems.",
+      "aliases": [
+        { "alias": "system design of OFC", "kind": "VARIANT" },
+        { "alias": "optic fiber communication system", "kind": "VARIANT" },
+        { "alias": "OFC based digital communication system", "kind": "VARIANT" }
+      ],
+      "projects": ["TELE 22", "MUMBAI SURAT-OFC _2.91CR"]
+    },
+    {
+      "code": "RAILNET",
+      "name": "Railnet provision, extension and strengthening",
+      "category": "TELECOM_NETWORKING",
+      "description": "Provision, extension, upgradation and strengthening of Railnet connectivity across offices, stations and colonies.",
+      "aliases": [
+        { "alias": "railnet", "kind": "SYNONYM" },
+        { "alias": "rail net", "kind": "VARIANT" },
+        { "alias": "extension of railnet", "kind": "VARIANT" },
+        { "alias": "expansion and strengthening of railnet", "kind": "VARIANT" }
+      ],
+      "projects": ["Mumbai_GPON_1.59CR", "BIKANER_RAILNET 1.33 Cr.", "ADI_TELE 04_ 94 LC"]
+    },
+    {
+      "code": "GPON",
+      "name": "GPON network deployment",
+      "category": "TELECOM_NETWORKING",
+      "description": "Deployment of Gigabit Passive Optical Network access infrastructure.",
+      "aliases": [
+        { "alias": "GPON", "kind": "ABBREVIATION" },
+        { "alias": "gigabit passive optical network", "kind": "EXPANSION" },
+        { "alias": "passive optical network", "kind": "SYNONYM" }
+      ],
+      "projects": ["Mumbai_GPON_1.59CR"]
+    },
+    {
+      "code": "WIFI_PROVISION",
+      "name": "Wi-Fi provisioning at premises",
+      "category": "TELECOM_NETWORKING",
+      "description": "Provision of Wi-Fi coverage at workshops, sheds, stations and office premises.",
+      "aliases": [
+        { "alias": "wi-fi", "kind": "VARIANT" },
+        { "alias": "wifi", "kind": "VARIANT" },
+        { "alias": "wireless LAN", "kind": "SYNONYM" },
+        { "alias": "WLAN", "kind": "ABBREVIATION" }
+      ],
+      "projects": ["Mumbai_MMCT wifi_58LC"]
+    },
+    {
+      "code": "LAN_REVAMP",
+      "name": "Local Area Network provision and revamping",
+      "category": "TELECOM_NETWORKING",
+      "description": "Provision, revamping and upgradation of structured local area network infrastructure.",
+      "aliases": [
+        { "alias": "LAN", "kind": "ABBREVIATION" },
+        { "alias": "local area network", "kind": "EXPANSION" },
+        { "alias": "revamping of local area network", "kind": "VARIANT" },
+        { "alias": "structured cabling", "kind": "SYNONYM" }
+      ],
+      "projects": ["NTPC Vindhyachal"]
+    },
+    {
+      "code": "CENTRAL_MONITORING_SYSTEM",
+      "name": "Central Monitoring System supply",
+      "category": "TELECOM_NETWORKING",
+      "description": "Supply of centralised monitoring system infrastructure.",
+      "aliases": [
+        { "alias": "central monitoring system", "kind": "VARIANT" },
+        { "alias": "CMS", "kind": "ABBREVIATION" }
+      ],
+      "projects": ["PHQ\nRaipur"]
+    },
+    {
+      "code": "IT_HARDWARE_SUPPLY",
+      "name": "IT hardware supply and installation",
+      "category": "TELECOM_NETWORKING",
+      "description": "Supply and installation of desktops, printers, display units, network switches and allied IT items.",
+      "aliases": [
+        { "alias": "desktop printers display units switches", "kind": "VARIANT" },
+        { "alias": "IT related items", "kind": "VARIANT" },
+        { "alias": "computer hardware supply", "kind": "SYNONYM" }
+      ],
+      "projects": ["HMIS BYCULLA", "HMIS JRH"]
+    },
+    {
+      "code": "OFC_ASSET_MONITORING_NETWORK",
+      "name": "OFC-based networking for centralised asset monitoring",
+      "category": "TELECOM_NETWORKING",
+      "description": "OFC-based network build for centralised remote monitoring of vital safety assets.",
+      "aliases": [
+        { "alias": "OFC based networking", "kind": "VARIANT" },
+        { "alias": "centralized monitoring of vital safety assets", "kind": "VARIANT" }
+      ],
+      "projects": ["Agra-49_1.83 CR", "Agra-50_1.79 CR"]
+    },
+    {
+      "code": "SURVEY_RECONNAISSANCE",
+      "name": "Survey and site reconnaissance",
+      "category": "TELECOM_NETWORKING",
+      "description": "Route survey and site reconnaissance preparatory to telecom infrastructure works.",
+      "aliases": [
+        { "alias": "survey", "kind": "SYNONYM" },
+        { "alias": "site reconnaissance", "kind": "VARIANT" },
+        { "alias": "route survey", "kind": "VARIANT" }
+      ],
+      "projects": ["Mumbai", "NOFN"]
+    },
+    {
+      "code": "PUBLIC_AMENITIES",
+      "name": "Public amenities provision",
+      "category": "TELECOM_NETWORKING",
+      "description": "Provision of passenger-facing public amenity systems at stations.",
+      "aliases": [
+        { "alias": "public amenities", "kind": "SYNONYM" },
+        { "alias": "passenger amenities", "kind": "VARIANT" }
+      ],
+      "projects": ["BRC_94R_1.76CR"]
+    },
+
+    {
+      "code": "MSDAC",
+      "name": "Multi-Section Digital Axle Counter",
+      "category": "SIGNALLING",
+      "description": "Supply, installation, testing and commissioning of Multi-Section Digital Axle Counter systems for track occupancy detection.",
+      "aliases": [
+        { "alias": "MSDAC", "kind": "ABBREVIATION" },
+        { "alias": "multi-section digital axle counter", "kind": "EXPANSION" },
+        { "alias": "digital axle counter", "kind": "SYNONYM" }
+      ],
+      "projects": ["ADI-29", "Agra-49_1.83 CR", "Agra-50_1.79 CR"]
+    },
+    {
+      "code": "BPAC_AXLE_COUNTER",
+      "name": "High-availability axle counters for BPAC / IBS redundancy",
+      "category": "SIGNALLING",
+      "description": "Provision of high-availability digital axle counters achieving redundancy for Block Proving by Axle Counter applications at Intermediate Block Signalling sections.",
+      "aliases": [
+        { "alias": "BPAC", "kind": "ABBREVIATION" },
+        { "alias": "block proving by axle counter", "kind": "EXPANSION" },
+        { "alias": "IBS", "kind": "ABBREVIATION" },
+        { "alias": "intermediate block signalling", "kind": "EXPANSION" },
+        { "alias": "high availability digital axle counter", "kind": "VARIANT" }
+      ],
+      "projects": ["Ratlam_Axle Counter_5.10CR"]
+    },
+    {
+      "code": "EI_SYSTEM_INTEGRATION",
+      "name": "Electronic Interlocking system monitoring integration",
+      "category": "SIGNALLING",
+      "description": "Integration of Electronic Interlocking systems into centralised monitoring infrastructure.",
+      "aliases": [
+        { "alias": "EI", "kind": "ABBREVIATION" },
+        { "alias": "electronic interlocking", "kind": "EXPANSION" },
+        { "alias": "EI system", "kind": "VARIANT" },
+        { "alias": "interlocking", "kind": "SYNONYM" }
+      ],
+      "projects": ["Agra-49_1.83 CR", "Agra-50_1.79 CR"]
+    },
+    {
+      "code": "DATA_LOGGER",
+      "name": "Data Logger integration",
+      "category": "SIGNALLING",
+      "description": "Integration of signalling data loggers into remote and centralised monitoring systems.",
+      "aliases": [
+        { "alias": "data logger", "kind": "SYNONYM" },
+        { "alias": "datalogger", "kind": "VARIANT" }
+      ],
+      "projects": ["Agra-49_1.83 CR", "Agra-50_1.79 CR"]
+    },
+    {
+      "code": "KAVACH_RSSI_SURVEY",
+      "name": "Kavach RSSI site reconnaissance survey",
+      "category": "SIGNALLING",
+      "description": "Site reconnaissance survey of Radio Signal Strength Indication in connection with Kavach train collision avoidance deployment.",
+      "aliases": [
+        { "alias": "Kavach", "kind": "SYNONYM" },
+        { "alias": "RSSI", "kind": "ABBREVIATION" },
+        { "alias": "radio signal strength indication", "kind": "EXPANSION" },
+        { "alias": "TCAS", "kind": "SYNONYM" },
+        { "alias": "train collision avoidance system", "kind": "EXPANSION" }
+      ],
+      "projects": ["Chennai_1.18CR", "Kerala_1.61 CR"]
+    },
+    {
+      "code": "SNT_MATERIAL_SUPPLY",
+      "name": "S&T material supply",
+      "category": "SIGNALLING",
+      "description": "Supply of signal and telecommunication material against departmental specification.",
+      "aliases": [
+        { "alias": "S&T", "kind": "ABBREVIATION" },
+        { "alias": "SnT", "kind": "VARIANT" },
+        { "alias": "signal and telecommunication", "kind": "EXPANSION" },
+        { "alias": "signaling material", "kind": "VARIANT" }
+      ],
+      "projects": ["ADI-29", "Ratlam_Axle Counter_5.10CR"]
+    },
+
+    {
+      "code": "AV_CONFERENCE_SYSTEM",
+      "name": "Audio / video conference system provision",
+      "category": "AUDIO_VISUAL",
+      "description": "Supply and installation of audio and video conferencing systems in office and meeting environments.",
+      "aliases": [
+        { "alias": "audio video conference system", "kind": "VARIANT" },
+        { "alias": "VC", "kind": "ABBREVIATION" },
+        { "alias": "video conference", "kind": "EXPANSION" },
+        { "alias": "AV system", "kind": "SYNONYM" }
+      ],
+      "projects": ["DELHI_944_27 LC"]
+    },
+    {
+      "code": "MEETING_ROOM_FITOUT",
+      "name": "VC room, meeting room and visitor lounge fit-out",
+      "category": "AUDIO_VISUAL",
+      "description": "Fit-out of meeting rooms, VC rooms and visitor lounges with integrated AV and telecom services.",
+      "aliases": [
+        { "alias": "meeting room", "kind": "VARIANT" },
+        { "alias": "VC room", "kind": "VARIANT" },
+        { "alias": "visitor lounge", "kind": "VARIANT" }
+      ],
+      "projects": ["DELHI_935_76LC"]
+    },
+    {
+      "code": "CONFERENCE_HALL_FITOUT",
+      "name": "Conference hall fit-out and upgradation",
+      "category": "AUDIO_VISUAL",
+      "description": "Development, upgradation and equipping of conference halls including supply and installation of AV and telecom equipment.",
+      "aliases": [
+        { "alias": "conference hall", "kind": "VARIANT" },
+        { "alias": "development of conference hall", "kind": "VARIANT" },
+        { "alias": "upgradation of conference hall", "kind": "VARIANT" }
+      ],
+      "projects": ["ADI_Tele-05_61LC _MIDDLE", "ADI_Tele-07_1.13CR", "NTPC\nVindhyachal "]
+    },
+    {
+      "code": "PA_SYSTEM",
+      "name": "Public Address system provision and upgradation",
+      "category": "AUDIO_VISUAL",
+      "description": "Provision and upgradation of public address and passenger announcement systems at stations.",
+      "aliases": [
+        { "alias": "PA system", "kind": "ABBREVIATION" },
+        { "alias": "public address system", "kind": "EXPANSION" },
+        { "alias": "PA/PIS", "kind": "VARIANT" },
+        { "alias": "announcement system", "kind": "SYNONYM" }
+      ],
+      "projects": ["Jhansi 52"]
+    },
+    {
+      "code": "CONTROL_ROOM_PROVISION",
+      "name": "Control room and integrated control office provision",
+      "category": "AUDIO_VISUAL",
+      "description": "Provision of new control rooms and integrated control offices including network integration of control circuits and telecom equipment.",
+      "aliases": [
+        { "alias": "control room", "kind": "VARIANT" },
+        { "alias": "control office", "kind": "VARIANT" },
+        { "alias": "integrated control office", "kind": "VARIANT" },
+        { "alias": "new control room", "kind": "VARIANT" }
+      ],
+      "projects": ["ADI_TELE 04_ 94 LC", "SONPUR_1.97CR", "ADI_TELE 05_OLD_2.12"]
+    },
+    {
+      "code": "VOICE_LOGGER",
+      "name": "Voice logger provision",
+      "category": "AUDIO_VISUAL",
+      "description": "Supply, installation and commissioning of voice logging systems for control circuits.",
+      "aliases": [
+        { "alias": "voice logger", "kind": "SYNONYM" },
+        { "alias": "voice logging system", "kind": "VARIANT" }
+      ],
+      "projects": ["ADI_TELE 05_OLD_2.12"]
+    },
+    {
+      "code": "BUILDING_TELECOM_FITOUT",
+      "name": "Telecom and internet facility in building renovation",
+      "category": "AUDIO_VISUAL",
+      "description": "Provision of telecom and internet facilities as part of office building renovation works.",
+      "aliases": [
+        { "alias": "telecom internet facility", "kind": "VARIANT" },
+        { "alias": "internet facility", "kind": "SYNONYM" },
+        { "alias": "renovation telecom", "kind": "VARIANT" }
+      ],
+      "projects": ["DELHI_935_76LC"]
+    },
+    {
+      "code": "SHED_DEPOT_TELECOM",
+      "name": "Auto telephone and shed / depot telecom facilities",
+      "category": "AUDIO_VISUAL",
+      "description": "Provision of telecom facilities including auto telephone and control circuits at crane sheds, diesel sheds and electric sheds.",
+      "aliases": [
+        { "alias": "auto telephone", "kind": "VARIANT" },
+        { "alias": "telecom facilities at shed", "kind": "VARIANT" },
+        { "alias": "diesel shed telecom", "kind": "VARIANT" }
+      ],
+      "projects": ["ADI_TELE 04_ 94 LC"]
+    }
+  ]
+}
