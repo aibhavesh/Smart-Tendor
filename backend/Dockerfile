@@ -8,7 +8,7 @@ WORKDIR /app
 
 # System deps for pdfplumber/pymupdf and asyncpg builds.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential libpq-dev \
+    && apt-get install -y --no-install-recommends build-essential libpq-dev tesseract-ocr \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml ./

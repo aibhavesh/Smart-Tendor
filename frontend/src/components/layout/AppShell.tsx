@@ -6,9 +6,8 @@ import {
   FileSearch,
   FolderKanban,
   LayoutDashboard,
-  ScrollText,
+  BadgeIndianRupee,
   Settings,
-  ShieldCheck,
   Upload,
   UserPlus,
   UserRound,
@@ -40,11 +39,10 @@ const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, minRole: "EMPLOYEE" },
   { href: "/tenders", label: "Tenders", icon: FileSearch, minRole: "EMPLOYEE" },
   { href: "/tenders/upload", label: "Add a tender", icon: Upload, minRole: "EMPLOYEE" },
-  { href: "/reviews", label: "Reviews", icon: ShieldCheck, minRole: "EMPLOYEE" },
   { href: "/projects", label: "Past projects", icon: FolderKanban, minRole: "EMPLOYEE" },
+  { href: "/turnover", label: "Certified turnover", icon: BadgeIndianRupee, minRole: "MANAGER" },
   { href: "/admin", label: "Administration", icon: Settings, minRole: "ADMIN" },
   { href: "/admin/role-assignments", label: "Pre-provisioned roles", icon: UserPlus, minRole: "ADMIN" },
-  { href: "/admin/audit-logs", label: "Audit logs", icon: ScrollText, minRole: "ADMIN" },
 ];
 
 function matches(pathname: string, href: string) {

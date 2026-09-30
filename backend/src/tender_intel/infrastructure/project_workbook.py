@@ -68,6 +68,7 @@ PROJECT_HEADER_ALIASES: dict[str, str] = {
     "amount": "work_value",
     "po value": "work_value",
     "loa value": "work_value",
+    "final loa amount": "work_value",
     "project value": "work_value",
     # --- loa_reference ---
     "loa": "loa_reference",
@@ -85,6 +86,7 @@ PROJECT_HEADER_ALIASES: dict[str, str] = {
     # --- completion_certificate_date ---
     "completion certificate": "completion_certificate_date",
     "completion certificate date": "completion_certificate_date",
+    "completion certificate dated": "completion_certificate_date",
     "cc date": "completion_certificate_date",
     "certificate date": "completion_certificate_date",
     "pcc": "completion_certificate_date",

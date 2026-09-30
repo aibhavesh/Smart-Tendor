@@ -9,7 +9,6 @@ from tender_intel.api.dependencies.db import get_app_settings, get_session
 from tender_intel.api.dependencies.providers import (
     get_downloader,
     get_embedding_provider,
-    get_llm_provider,
     get_metadata_backend,
     get_storage,
     get_table_extractor,
@@ -17,10 +16,10 @@ from tender_intel.api.dependencies.providers import (
     get_vector_store,
 )
 from tender_intel.api.dependencies.repositories import (
+    NoOpAuditLogRepository,
     get_audit_repo,
     get_boq_repo,
     get_eligibility_repo,
-    get_notification_repo,
     get_past_project_repo,
     get_portfolio_version_repo,
     get_role_assignment_repo,
@@ -28,51 +27,39 @@ from tender_intel.api.dependencies.repositories import (
     get_tender_document_repo,
     get_tender_metadata_repo,
     get_tender_repo,
-    get_tender_review_repo,
     get_turnover_repo,
     get_user_repo,
     get_user_session_repo,
     get_work_type_repo,
 )
 from tender_intel.application.services.admin_service import AdminService
-from tender_intel.application.services.analyst_service import AnalystService
 from tender_intel.application.services.auth_service import AuthService
 from tender_intel.application.services.company_turnover_service import CompanyTurnoverService
-from tender_intel.application.services.decision_service import DecisionService
 from tender_intel.application.services.document_service import DocumentService
 from tender_intel.application.services.eligibility_service import EligibilityService
 from tender_intel.application.services.extraction_service import ExtractionService
-from tender_intel.application.services.matching_service import MatchingService
-from tender_intel.application.services.notification_service import (
-    EligibilityNotificationService,
-)
 from tender_intel.application.services.past_project_service import PastProjectService
 from tender_intel.application.services.platform_service import PlatformService
 from tender_intel.application.services.project_import_service import ProjectImportService
 from tender_intel.application.services.retirement_service import TenderRetirementService
-from tender_intel.application.services.review_service import ReviewService
 from tender_intel.application.services.tender_service import TenderService
+from tender_intel.application.services.turnover_import_service import TurnoverImportService
 from tender_intel.application.services.work_type_service import WorkTypeService
 from tender_intel.core.config import Settings
 from tender_intel.domain.interfaces.providers import (
     DocumentTextExtractor,
     EmbeddingProvider,
-    LLMProvider,
     VectorStore,
 )
 from tender_intel.infrastructure.downloader import HttpxDownloader
-from tender_intel.infrastructure.email import SmtpEmailSender
 from tender_intel.infrastructure.extraction.pdf_backends import PdfPlumberBOQExtractor
 from tender_intel.infrastructure.extraction.rule_metadata import RuleBasedMetadataExtractor
-from tender_intel.infrastructure.repositories.audit_repo import SqlAlchemyAuditLogRepository
 from tender_intel.infrastructure.repositories.eligibility_repo import (
     SqlAlchemyCompanyTurnoverRepository,
-    SqlAlchemyEligibilityNotificationRepository,
     SqlAlchemyPortfolioVersionRepository,
     SqlAlchemyTenderEligibilityRepository,
 )
 from tender_intel.infrastructure.repositories.project_repo import SqlAlchemyPastProjectRepository
-from tender_intel.infrastructure.repositories.review_repo import SqlAlchemyTenderReviewRepository
 from tender_intel.infrastructure.repositories.role_assignment_repo import (
     SqlAlchemyRoleAssignmentRepository,
 )
@@ -109,7 +96,7 @@ def get_auth_service(
     users: SqlAlchemyUserRepository = Depends(get_user_repo),
     sessions: SqlAlchemyUserSessionRepository = Depends(get_user_session_repo),
     assignments: SqlAlchemyRoleAssignmentRepository = Depends(get_role_assignment_repo),
-    audits: SqlAlchemyAuditLogRepository = Depends(get_audit_repo),
+    audits: NoOpAuditLogRepository = Depends(get_audit_repo),
     tokens: TokenService = Depends(get_token_service),
     google: GoogleTokenVerifierImpl = Depends(get_google_verifier),
     settings: Settings = Depends(get_app_settings),
@@ -128,7 +115,7 @@ def get_auth_service(
 def get_document_service(
     tenders: SqlAlchemyTenderRepository = Depends(get_tender_repo),
     documents: SqlAlchemyTenderDocumentRepository = Depends(get_tender_document_repo),
-    audits: SqlAlchemyAuditLogRepository = Depends(get_audit_repo),
+    audits: NoOpAuditLogRepository = Depends(get_audit_repo),
     downloader: HttpxDownloader = Depends(get_downloader),
     storage: LocalFileStorage = Depends(get_storage),
 ) -> DocumentService:
@@ -143,7 +130,7 @@ def get_document_service(
 
 def get_tender_service(
     tenders: SqlAlchemyTenderRepository = Depends(get_tender_repo),
-    audits: SqlAlchemyAuditLogRepository = Depends(get_audit_repo),
+    audits: NoOpAuditLogRepository = Depends(get_audit_repo),
     documents: DocumentService = Depends(get_document_service),
 ) -> TenderService:
     return TenderService(tenders=tenders, audits=audits, documents=documents)
@@ -154,7 +141,7 @@ def get_extraction_service(
     documents: SqlAlchemyTenderDocumentRepository = Depends(get_tender_document_repo),
     metadata_repo: SqlAlchemyTenderMetadataRepository = Depends(get_tender_metadata_repo),
     boq_repo: SqlAlchemyBOQItemRepository = Depends(get_boq_repo),
-    audits: SqlAlchemyAuditLogRepository = Depends(get_audit_repo),
+    audits: NoOpAuditLogRepository = Depends(get_audit_repo),
     storage: LocalFileStorage = Depends(get_storage),
     text_extractor: DocumentTextExtractor = Depends(get_text_extractor),
     table_extractor: PdfPlumberBOQExtractor = Depends(get_table_extractor),
@@ -175,36 +162,14 @@ def get_extraction_service(
 
 def get_past_project_service(
     projects: SqlAlchemyPastProjectRepository = Depends(get_past_project_repo),
-    audits: SqlAlchemyAuditLogRepository = Depends(get_audit_repo),
+    audits: NoOpAuditLogRepository = Depends(get_audit_repo),
     embeddings: EmbeddingProvider = Depends(get_embedding_provider),
     vectors: VectorStore = Depends(get_vector_store),
-    text_extractor: DocumentTextExtractor = Depends(get_text_extractor),
-    metadata_backend: RuleBasedMetadataExtractor = Depends(get_metadata_backend),
     settings: Settings = Depends(get_app_settings),
 ) -> PastProjectService:
     return PastProjectService(
         projects=projects,
         audits=audits,
-        embeddings=embeddings,
-        vectors=vectors,
-        collection=settings.qdrant_collection,
-        text_extractor=text_extractor,
-        metadata_backend=metadata_backend,
-    )
-
-
-def get_matching_service(
-    tenders: SqlAlchemyTenderRepository = Depends(get_tender_repo),
-    metadata_repo: SqlAlchemyTenderMetadataRepository = Depends(get_tender_metadata_repo),
-    projects: SqlAlchemyPastProjectRepository = Depends(get_past_project_repo),
-    embeddings: EmbeddingProvider = Depends(get_embedding_provider),
-    vectors: VectorStore = Depends(get_vector_store),
-    settings: Settings = Depends(get_app_settings),
-) -> MatchingService:
-    return MatchingService(
-        tenders=tenders,
-        metadata_repo=metadata_repo,
-        projects=projects,
         embeddings=embeddings,
         vectors=vectors,
         collection=settings.qdrant_collection,
@@ -219,7 +184,7 @@ def get_eligibility_service(
     turnover: SqlAlchemyCompanyTurnoverRepository = Depends(get_turnover_repo),
     results: SqlAlchemyTenderEligibilityRepository = Depends(get_eligibility_repo),
     versions: SqlAlchemyPortfolioVersionRepository = Depends(get_portfolio_version_repo),
-    audits: SqlAlchemyAuditLogRepository = Depends(get_audit_repo),
+    audits: NoOpAuditLogRepository = Depends(get_audit_repo),
     embeddings: EmbeddingProvider = Depends(get_embedding_provider),
     vectors: VectorStore = Depends(get_vector_store),
     settings: Settings = Depends(get_app_settings),
@@ -243,7 +208,7 @@ def get_work_type_service(
     work_types: SqlAlchemyWorkTypeRepository = Depends(get_work_type_repo),
     projects: SqlAlchemyPastProjectRepository = Depends(get_past_project_repo),
     versions: SqlAlchemyPortfolioVersionRepository = Depends(get_portfolio_version_repo),
-    audits: SqlAlchemyAuditLogRepository = Depends(get_audit_repo),
+    audits: NoOpAuditLogRepository = Depends(get_audit_repo),
 ) -> WorkTypeService:
     return WorkTypeService(
         work_types=work_types, projects=projects, versions=versions, audits=audits
@@ -255,7 +220,7 @@ def get_project_import_service(
     work_types: WorkTypeService = Depends(get_work_type_service),
     work_type_repo: SqlAlchemyWorkTypeRepository = Depends(get_work_type_repo),
     project_repo: SqlAlchemyPastProjectRepository = Depends(get_past_project_repo),
-    audits: SqlAlchemyAuditLogRepository = Depends(get_audit_repo),
+    audits: NoOpAuditLogRepository = Depends(get_audit_repo),
 ) -> ProjectImportService:
     return ProjectImportService(
         projects=projects,
@@ -266,30 +231,11 @@ def get_project_import_service(
     )
 
 
-def get_notification_service(
-    tenders: SqlAlchemyTenderRepository = Depends(get_tender_repo),
-    results: SqlAlchemyTenderEligibilityRepository = Depends(get_eligibility_repo),
-    notifications: SqlAlchemyEligibilityNotificationRepository = Depends(get_notification_repo),
-    users: SqlAlchemyUserRepository = Depends(get_user_repo),
-    audits: SqlAlchemyAuditLogRepository = Depends(get_audit_repo),
-    settings: Settings = Depends(get_app_settings),
-) -> EligibilityNotificationService:
-    return EligibilityNotificationService(
-        tenders=tenders,
-        results=results,
-        notifications=notifications,
-        users=users,
-        sender=SmtpEmailSender(settings),
-        audits=audits,
-        enabled=settings.notification_enabled,
-    )
-
-
 def get_retirement_service(
     tenders: SqlAlchemyTenderRepository = Depends(get_tender_repo),
     documents: SqlAlchemyTenderDocumentRepository = Depends(get_tender_document_repo),
     storage: LocalFileStorage = Depends(get_storage),
-    audits: SqlAlchemyAuditLogRepository = Depends(get_audit_repo),
+    audits: NoOpAuditLogRepository = Depends(get_audit_repo),
 ) -> TenderRetirementService:
     return TenderRetirementService(
         tenders=tenders, documents=documents, storage=storage, audits=audits
@@ -298,51 +244,22 @@ def get_retirement_service(
 
 def get_company_turnover_service(
     turnover: SqlAlchemyCompanyTurnoverRepository = Depends(get_turnover_repo),
-    audits: SqlAlchemyAuditLogRepository = Depends(get_audit_repo),
+    audits: NoOpAuditLogRepository = Depends(get_audit_repo),
 ) -> CompanyTurnoverService:
     return CompanyTurnoverService(turnover=turnover, audits=audits)
 
 
-def get_decision_service(
-    tenders: SqlAlchemyTenderRepository = Depends(get_tender_repo),
-    metadata_repo: SqlAlchemyTenderMetadataRepository = Depends(get_tender_metadata_repo),
-    matching: MatchingService = Depends(get_matching_service),
-    eligibility: EligibilityService = Depends(get_eligibility_service),
-    audits: SqlAlchemyAuditLogRepository = Depends(get_audit_repo),
-) -> DecisionService:
-    return DecisionService(
-        tenders=tenders,
-        metadata_repo=metadata_repo,
-        matching=matching,
-        eligibility=eligibility,
-        audits=audits,
-    )
-
-
-def get_analyst_service(
-    decision: DecisionService = Depends(get_decision_service),
-    tenders: SqlAlchemyTenderRepository = Depends(get_tender_repo),
-    llm: LLMProvider = Depends(get_llm_provider),
-) -> AnalystService:
-    return AnalystService(decision=decision, tenders=tenders, llm=llm)
-
-
-def get_review_service(
-    reviews: SqlAlchemyTenderReviewRepository = Depends(get_tender_review_repo),
-    tenders: SqlAlchemyTenderRepository = Depends(get_tender_repo),
-    metadata_repo: SqlAlchemyTenderMetadataRepository = Depends(get_tender_metadata_repo),
-    audits: SqlAlchemyAuditLogRepository = Depends(get_audit_repo),
-) -> ReviewService:
-    return ReviewService(
-        reviews=reviews, tenders=tenders, metadata_repo=metadata_repo, audits=audits
-    )
+def get_turnover_import_service(
+    text_extractor: DocumentTextExtractor = Depends(get_text_extractor),
+) -> TurnoverImportService:
+    return TurnoverImportService(text_extractor=text_extractor)
 
 
 def get_admin_service(
     users: SqlAlchemyUserRepository = Depends(get_user_repo),
     sessions: SqlAlchemyUserSessionRepository = Depends(get_user_session_repo),
     assignments: SqlAlchemyRoleAssignmentRepository = Depends(get_role_assignment_repo),
-    audits: SqlAlchemyAuditLogRepository = Depends(get_audit_repo),
+    audits: NoOpAuditLogRepository = Depends(get_audit_repo),
     settings: Settings = Depends(get_app_settings),
 ) -> AdminService:
     return AdminService(

@@ -173,6 +173,19 @@ async def test_an_unsupported_extension_is_reported_not_raised(client, app_db):
     assert "unsupported file type" in resp.json()["files"][0]["message"]
 
 
+async def test_a_pdf_is_rejected_as_a_non_project_document(client, app_db):
+    headers = await auth_headers(client, app_db)
+    resp = await client.post(
+        IMPORT_URL,
+        headers=headers,
+        files={"files": ("turnover.pdf", b"not a past-project workbook", "application/pdf")},
+    )
+    body = resp.json()
+    assert body["created"] == 0
+    assert body["files"][0]["outcome"] == "error"
+    assert "Excel workbook" in body["files"][0]["message"]
+
+
 async def test_a_row_without_a_name_fails_alone(client, app_db):
     headers = await auth_headers(client, app_db)
     content = workbook_bytes(

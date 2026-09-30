@@ -73,6 +73,23 @@ async def test_patch_and_delete(client, app_db):
     assert (await client.get(f"/tenders/{created['id']}", headers=headers)).status_code == 404
 
 
+async def test_manager_can_delete_all_tenders(client, app_db):
+    manager = await auth_headers(client, app_db, email="manager@example.com", role=UserRole.MANAGER)
+    await client.post("/tenders", json={"tender_number": "T-BULK-1", "title": "First"}, headers=manager)
+    await client.post("/tenders", json={"tender_number": "T-BULK-2", "title": "Second"}, headers=manager)
+
+    response = await client.delete("/tenders", headers=manager)
+    assert response.status_code == 200
+    assert response.json() == {"deleted": 2}
+    assert (await client.get("/tenders", headers=manager)).json()["total"] == 0
+
+
+async def test_delete_all_tenders_requires_a_manager(client, app_db):
+    employee = await auth_headers(client, app_db, email="employee@example.com", role=UserRole.EMPLOYEE)
+    response = await client.delete("/tenders", headers=employee)
+    assert response.status_code == 403
+
+
 async def test_get_missing_tender_404(client, app_db):
     headers = await auth_headers(client, app_db)
     resp = await client.get("/tenders/00000000-0000-0000-0000-000000000000", headers=headers)

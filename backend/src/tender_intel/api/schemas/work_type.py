@@ -153,3 +153,16 @@ class TurnoverResponse(BaseModel):
             recorded_by=t.recorded_by,
             recorded_at=t.recorded_at,
         )
+
+
+class TurnoverExtractionResponse(BaseModel):
+    """A value found in a certificate and awaiting manager confirmation."""
+
+    financial_year: str
+    contractual_turnover: Decimal
+    source_file: str
+
+
+class TurnoverImportResponse(BaseModel):
+    records: list[TurnoverExtractionResponse]
+    warnings: list[str]

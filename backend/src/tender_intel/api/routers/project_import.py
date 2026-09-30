@@ -31,7 +31,7 @@ async def bulk_import_projects(
     service: ProjectImportService = Depends(get_project_import_service),
     user: User = Depends(require_role(UserRole.EMPLOYEE)),
 ) -> ProjectImportResponse:
-    """Import many PDF or XLSX files in one operation.
+    """Import many Excel workbooks in one operation.
 
     A file that fails is reported in its own entry and never aborts the batch.
     With ``auto_tag`` the stage A cascade links each imported project to the work
@@ -39,7 +39,7 @@ async def bulk_import_projects(
     evidence; without it every imported project needs tagging by hand before any
     eligibility screen will see it.
     """
-    payload = [(f.filename or "upload", await f.read(), f.content_type) for f in files]
+    payload = [(f.filename or "upload", await f.read()) for f in files]
     result = await service.import_files(
         payload,
         auto_tag=auto_tag,

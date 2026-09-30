@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { FileWarning, Upload } from "lucide-react";
+import { Check, CircleHelp, FileWarning, Upload, X } from "lucide-react";
 import { RequireAuth } from "@/components/layout/RequireAuth";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { ButtonLink } from "@/components/ui/Button";
+import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/States";
 import { Pagination, TBody, TD, TH, THead, TR, Table } from "@/components/ui/Table";
 import { SelectField, TextField } from "@/components/ui/Field";
-import { api, query } from "@/lib/api";
+import { api, describeError, query } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { canActAs } from "@/lib/roles";
 import { useAuth } from "@/lib/auth";
@@ -19,18 +20,56 @@ import { NO_DOCUMENT_STATUS, TENDER_STATUS_LABEL } from "@/lib/tender-status";
 import { TENDER_STATUSES, type Page, type Tender, type TenderStatus } from "@/lib/types";
 
 const LIMIT = 20;
+type EligibilityStatus = "ELIGIBLE" | "NOT_ELIGIBLE" | "INDETERMINATE";
+
+function EligibilityDecision({ status }: { status: EligibilityStatus | null | undefined }) {
+  if (status === "ELIGIBLE") {
+    return <span className="inline-flex items-center gap-1.5 rounded-full bg-state-go-ink px-2.5 py-1 text-mini font-black tracking-wide text-white"><Check className="h-3 w-3" aria-hidden="true" />Eligible</span>;
+  }
+  if (status === "NOT_ELIGIBLE") {
+    return <span className="inline-flex items-center gap-1.5 rounded-full bg-state-danger px-2.5 py-1 text-mini font-black tracking-wide text-white"><X className="h-3 w-3" aria-hidden="true" />Not eligible</span>;
+  }
+  if (status === "INDETERMINATE") {
+    return <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-deep px-2.5 py-1 text-mini font-black tracking-wide text-white"><CircleHelp className="h-3 w-3" aria-hidden="true" />Needs review</span>;
+  }
+  return <span className="text-caption text-ink-muted">Screening…</span>;
+}
 
 function TendersBody() {
   const { user } = useAuth();
   const canWrite = canActAs(user?.role, "EMPLOYEE");
+  const canBulkDelete = canActAs(user?.role, "MANAGER");
 
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<TenderStatus | "">("");
+  const [eligibilityStatus, setEligibilityStatus] = useState<EligibilityStatus | "">("");
   const [offset, setOffset] = useState(0);
+  const [deleteMessage, setDeleteMessage] = useState<string | null>(null);
 
   const page = useResource<Page<Tender>>(
-    (signal) => api.get(`/tenders${query({ limit: LIMIT, offset, status, search })}`, signal),
-    [offset, status, search],
+    (signal) => api.get(`/tenders${query({ limit: LIMIT, offset, status, eligibility: eligibilityStatus, search })}`, signal),
+    [offset, status, eligibilityStatus, search],
+  );
+  const tenderIds = page.data?.items.map((tender) => tender.id).join(",") ?? "";
+  const eligibility = useResource<Record<string, EligibilityStatus | null>>(
+    async (signal) => {
+      const rows = await Promise.all(
+        (page.data?.items ?? []).map(async (tender) => {
+          try {
+            const result = await api.get<{ status: EligibilityStatus }>(
+              `/api/v1/tenders/${tender.id}/eligibility`,
+              signal,
+            );
+            return [tender.id, result.status] as const;
+          } catch {
+            return [tender.id, null] as const;
+          }
+        }),
+      );
+      return Object.fromEntries(rows);
+    },
+    [tenderIds],
+    { enabled: tenderIds.length > 0 },
   );
 
   /*
@@ -53,6 +92,18 @@ function TendersBody() {
     };
   }
 
+  async function deleteAll() {
+    setDeleteMessage(null);
+    try {
+      const result = await api.del<{ deleted: number }>("/tenders");
+      setDeleteMessage(`${result.deleted} tender${result.deleted === 1 ? "" : "s"} permanently deleted.`);
+      setOffset(0);
+      page.reload();
+    } catch (error) {
+      setDeleteMessage(describeError(error));
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -64,16 +115,34 @@ function TendersBody() {
         </div>
         {/* One way in. Registering a tender and importing a workbook both live on the
             upload screen now, alongside the document that makes the record useful. */}
-        {canWrite ? (
-          <ButtonLink href="/tenders/upload" size="sm">
-            <Upload className="w-3.5 h-3.5" aria-hidden="true" />
-            Add a tender
-          </ButtonLink>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {canBulkDelete && (page.data?.total ?? 0) > 0 ? (
+            <ConfirmButton
+              label={`Delete all (${page.data?.total ?? 0})`}
+              confirmLabel="Permanently delete all"
+              onConfirm={deleteAll}
+            />
+          ) : null}
+          {canWrite ? (
+            <ButtonLink href="/tenders/upload" size="sm">
+              <Upload className="w-3.5 h-3.5" aria-hidden="true" />
+              Add a tender
+            </ButtonLink>
+          ) : null}
+        </div>
       </div>
 
+      {deleteMessage ? (
+        <p
+          role="status"
+          className="rounded-control border border-ink-strong/10 bg-surface px-3 py-2 text-caption text-ink-strong"
+        >
+          {deleteMessage}
+        </p>
+      ) : null}
+
       <Card>
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_220px] gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_220px_220px] gap-4">
           <TextField
             label="Search"
             placeholder="Number, title or department"
@@ -91,6 +160,12 @@ function TendersBody() {
                 {TENDER_STATUS_LABEL[s]} ({s})
               </option>
             ))}
+          </SelectField>
+          <SelectField label="Eligibility decision" value={eligibilityStatus} onChange={(e) => applyFilter(setEligibilityStatus)(e.target.value as EligibilityStatus | "")}>
+            <option value="">All decisions</option>
+            <option value="ELIGIBLE">Eligible</option>
+            <option value="NOT_ELIGIBLE">Not eligible</option>
+            <option value="INDETERMINATE">Needs review</option>
           </SelectField>
         </div>
 
@@ -151,8 +226,10 @@ function TendersBody() {
                 <TH>Number</TH>
                 <TH>Title</TH>
                 <TH>Status</TH>
+                <TH>Eligibility</TH>
                 <TH>Department</TH>
                 <TH>Closing</TH>
+                {canWrite ? <TH className="text-right">Actions</TH> : null}
               </THead>
               <TBody>
                 {page.data.items.map((t) => (
@@ -169,10 +246,31 @@ function TendersBody() {
                     <TD>
                       <TenderStatusTag status={t.status} />
                     </TD>
+                    <TD>
+                      <EligibilityDecision status={eligibility.data?.[t.id]} />
+                    </TD>
                     <TD className="text-caption text-ink-muted">{t.department ?? "—"}</TD>
                     <TD className="whitespace-nowrap text-caption text-ink-muted">
                       {formatDate(t.closing_date) ?? "—"}
                     </TD>
+                    {canWrite ? (
+                      <TD className="text-right whitespace-nowrap">
+                        <ConfirmButton
+                          label="Delete"
+                          confirmLabel="Delete permanently"
+                          onConfirm={async () => {
+                            setDeleteMessage(null);
+                            try {
+                              await api.del(`/tenders/${t.id}`);
+                              setDeleteMessage(`Tender ${t.tender_number} permanently deleted.`);
+                              page.reload();
+                            } catch (error) {
+                              setDeleteMessage(describeError(error));
+                            }
+                          }}
+                        />
+                      </TD>
+                    ) : null}
                   </TR>
                 ))}
               </TBody>

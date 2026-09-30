@@ -162,6 +162,36 @@ class BOQItemModel(Base):
     confidence: Mapped[float] = mapped_column(default=0.0)
 
 
+# Retained only to let old migration revisions import; the workflow-reduction
+# migration drops this table and the running application never registers a writer.
+class TenderReviewModel(Base):
+    __tablename__ = "tender_reviews"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    tender_id: Mapped[UUID] = mapped_column(ForeignKey("tenders.id", ondelete="CASCADE"))
+    reviewer_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    kind: Mapped[str] = mapped_column(String(16))
+    verdict: Mapped[str | None] = mapped_column(String(32))
+    comments: Mapped[str | None] = mapped_column(Text)
+    before_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    after_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime)
+
+
+class AuditLogModel(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    action: Mapped[str] = mapped_column(String(128))
+    entity_type: Mapped[str] = mapped_column(String(64))
+    entity_id: Mapped[str | None] = mapped_column(String(128))
+    actor_id: Mapped[UUID | None] = mapped_column(Uuid)
+    diff: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    ip_address: Mapped[str | None] = mapped_column(String(64))
+    user_agent: Mapped[str | None] = mapped_column(String(512))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime)
+
+
 class PastProjectModel(TimestampMixin, Base):
     __tablename__ = "past_projects"
 
@@ -187,39 +217,6 @@ class PastProjectModel(TimestampMixin, Base):
     # the date is present.
     completion_certificate_date: Mapped[date | None] = mapped_column(Date)
     completion_certificate_note: Mapped[str | None] = mapped_column(String(64))
-
-
-class TenderReviewModel(Base):
-    __tablename__ = "tender_reviews"
-
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    tender_id: Mapped[UUID] = mapped_column(
-        ForeignKey("tenders.id", ondelete="CASCADE"), index=True
-    )
-    reviewer_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
-    # CORRECTION or VERDICT. Indexed because the platform statistics and the
-    # staleness lookup both filter on it.
-    kind: Mapped[str] = mapped_column(String(16), index=True)
-    # NULL on a CORRECTION record.
-    verdict: Mapped[str | None] = mapped_column(String(32))
-    comments: Mapped[str | None] = mapped_column(Text)
-    before_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
-    after_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(UTCDateTime)
-
-
-class AuditLogModel(Base):
-    __tablename__ = "audit_logs"
-
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    action: Mapped[str] = mapped_column(String(128), index=True)
-    entity_type: Mapped[str] = mapped_column(String(64), index=True)
-    entity_id: Mapped[str | None] = mapped_column(String(128), index=True)
-    actor_id: Mapped[UUID | None] = mapped_column(Uuid, index=True)
-    diff: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
-    ip_address: Mapped[str | None] = mapped_column(String(64))
-    user_agent: Mapped[str | None] = mapped_column(String(512))
-    created_at: Mapped[datetime] = mapped_column(UTCDateTime, index=True)
 
 
 # --------------------------------------------------------------------------- #
@@ -292,27 +289,12 @@ class CompanyTurnoverModel(Base):
 
 
 class EligibilityNotificationModel(Base):
-    """One digest send, recorded so a tender is not notified twice.
-
-    Unique on ``(tender_id, inputs_fingerprint)``: re-screening unchanged
-    inputs is silent, while a genuinely changed result notifies again.
-    """
-
     __tablename__ = "eligibility_notifications"
-    __table_args__ = (
-        UniqueConstraint(
-            "tender_id", "inputs_fingerprint", name="uq_eligibility_notification_inputs"
-        ),
-    )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    tender_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("tenders.id", ondelete="CASCADE"), index=True
-    )
+    tender_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("tenders.id", ondelete="CASCADE"))
     inputs_fingerprint: Mapped[str] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(32))
-    #: The addresses actually resolved at send time. The recipient set moves
-    #: as roles change, so the list is recorded rather than recomputed later.
     recipients: Mapped[list[str]] = mapped_column(JSON, default=list)
     sent_at: Mapped[datetime] = mapped_column(UTCDateTime)
 

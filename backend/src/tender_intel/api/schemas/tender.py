@@ -58,6 +58,12 @@ class TenderPatchRequest(BaseModel):
         )
 
 
+class TenderBulkDeleteResponse(BaseModel):
+    """Count returned after permanently clearing the tender registry."""
+
+    deleted: int
+
+
 class TenderResponse(BaseModel):
     id: UUID
     tender_number: str

@@ -70,6 +70,10 @@ class PastProjectPatchRequest(BaseModel):
         )
 
 
+class PastProjectBulkDeleteResponse(BaseModel):
+    deleted: int
+
+
 class PastProjectResponse(BaseModel):
     id: UUID
     name: str

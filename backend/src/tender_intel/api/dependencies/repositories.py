@@ -6,15 +6,12 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tender_intel.api.dependencies.db import get_session
-from tender_intel.infrastructure.repositories.audit_repo import SqlAlchemyAuditLogRepository
 from tender_intel.infrastructure.repositories.eligibility_repo import (
     SqlAlchemyCompanyTurnoverRepository,
-    SqlAlchemyEligibilityNotificationRepository,
     SqlAlchemyPortfolioVersionRepository,
     SqlAlchemyTenderEligibilityRepository,
 )
 from tender_intel.infrastructure.repositories.project_repo import SqlAlchemyPastProjectRepository
-from tender_intel.infrastructure.repositories.review_repo import SqlAlchemyTenderReviewRepository
 from tender_intel.infrastructure.repositories.role_assignment_repo import (
     SqlAlchemyRoleAssignmentRepository,
 )
@@ -70,12 +67,6 @@ def get_past_project_repo(
     return SqlAlchemyPastProjectRepository(session)
 
 
-def get_tender_review_repo(
-    session: AsyncSession = Depends(get_session),
-) -> SqlAlchemyTenderReviewRepository:
-    return SqlAlchemyTenderReviewRepository(session)
-
-
 def get_stats_repo(session: AsyncSession = Depends(get_session)) -> SqlAlchemyStatsRepository:
     return SqlAlchemyStatsRepository(session)
 
@@ -86,8 +77,15 @@ def get_user_session_repo(
     return SqlAlchemyUserSessionRepository(session)
 
 
-def get_audit_repo(session: AsyncSession = Depends(get_session)) -> SqlAlchemyAuditLogRepository:
-    return SqlAlchemyAuditLogRepository(session)
+class NoOpAuditLogRepository:
+    """Compatibility sink while retained services shed the retired audit flow."""
+
+    async def add(self, entry: object) -> None:
+        del entry
+
+
+def get_audit_repo() -> NoOpAuditLogRepository:
+    return NoOpAuditLogRepository()
 
 
 def get_work_type_repo(
@@ -100,12 +98,6 @@ def get_turnover_repo(
     session: AsyncSession = Depends(get_session),
 ) -> SqlAlchemyCompanyTurnoverRepository:
     return SqlAlchemyCompanyTurnoverRepository(session)
-
-
-def get_notification_repo(
-    session: AsyncSession = Depends(get_session),
-) -> SqlAlchemyEligibilityNotificationRepository:
-    return SqlAlchemyEligibilityNotificationRepository(session)
 
 
 def get_eligibility_repo(

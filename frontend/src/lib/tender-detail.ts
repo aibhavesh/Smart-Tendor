@@ -1,15 +1,14 @@
 import { api } from "./api";
-import type {
-  AnalystReport,
-  BOQAnalytics,
-  BOQItem,
-  Decision,
-  MatchResult,
-  Tender,
-  TenderDocument,
-  TenderMetadata,
-  TenderReview,
-} from "./types";
+import type { BOQItem, Tender, TenderDocument, TenderMetadata } from "./types";
+
+export interface TenderEligibility {
+  status: "ELIGIBLE" | "NOT_ELIGIBLE" | "INDETERMINATE";
+  is_stale: boolean;
+  financial_pass: boolean | null;
+  technical_pass: boolean | null;
+  rule_satisfied: string | null;
+  reasons: string[];
+}
 
 /*
  * Tender detail loading.
@@ -27,11 +26,7 @@ export interface TenderDetail {
   documents: TenderDocument[] | null;
   metadata: TenderMetadata | null;
   boq: BOQItem[] | null;
-  boqAnalytics: BOQAnalytics | null;
-  decision: Decision | null;
-  report: AnalystReport | null;
-  reviews: TenderReview[] | null;
-  matches: MatchResult | null;
+  eligibility: TenderEligibility | null;
 }
 
 async function optional<T>(promise: Promise<T>): Promise<T | null> {
@@ -46,17 +41,12 @@ export async function fetchTenderDetail(id: string, signal?: AbortSignal): Promi
   // Required: a missing tender is a real 404 and must reach the caller.
   const tender = await api.get<Tender>(`/tenders/${id}`, signal);
 
-  const [documents, metadata, boq, boqAnalytics, decision, report, reviews, matches] =
-    await Promise.all([
+  const [documents, metadata, boq, eligibility] = await Promise.all([
     optional(api.get<TenderDocument[]>(`/tenders/${id}/documents`, signal)),
     optional(api.get<TenderMetadata>(`/tenders/${id}/metadata`, signal)),
     optional(api.get<BOQItem[]>(`/tenders/${id}/boq`, signal)),
-    optional(api.get<BOQAnalytics>(`/tenders/${id}/boq/analytics`, signal)),
-    optional(api.get<Decision>(`/tenders/${id}/recommendation`, signal)),
-    optional(api.get<AnalystReport>(`/tenders/${id}/report`, signal)),
-    optional(api.get<TenderReview[]>(`/tenders/${id}/reviews`, signal)),
-      optional(api.get<MatchResult>(`/tenders/${id}/matches`, signal)),
-    ]);
+    optional(api.get<TenderEligibility>(`/api/v1/tenders/${id}/eligibility`, signal)),
+  ]);
 
-  return { tender, documents, metadata, boq, boqAnalytics, decision, report, reviews, matches };
+  return { tender, documents, metadata, boq, eligibility };
 }

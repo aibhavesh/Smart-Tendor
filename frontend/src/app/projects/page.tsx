@@ -93,6 +93,7 @@ function ProjectsBody() {
   const { user } = useAuth();
   const canWrite = canActAs(user?.role, "EMPLOYEE");
   const isAdmin = canActAs(user?.role, "ADMIN");
+  const canBulkDelete = canActAs(user?.role, "MANAGER");
 
   const [offset, setOffset] = useState(0);
   const [importing, setImporting] = useState(false);
@@ -104,6 +105,16 @@ function ProjectsBody() {
     (signal) => api.get(`/projects${query({ limit: LIMIT, offset })}`, signal),
     [offset],
   );
+  async function deleteAll() {
+    setRowError(null);
+    try {
+      const result = await api.del<{ deleted: number }>("/projects");
+      setBackfill(`${result.deleted} past project(s) permanently deleted.`);
+      page.reload();
+    } catch (err) {
+      setRowError(describeError(err));
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -117,6 +128,13 @@ function ProjectsBody() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {canBulkDelete && (page.data?.total ?? 0) > 0 ? (
+            <ConfirmButton
+              label={`Delete all (${page.data?.total ?? 0})`}
+              confirmLabel="Permanently delete all"
+              onConfirm={deleteAll}
+            />
+          ) : null}
           {isAdmin ? (
             <Button
               size="sm"
@@ -190,7 +208,7 @@ function ProjectsBody() {
         ) : page.data.items.length === 0 ? (
           <EmptyState
             title="No past projects yet"
-            description="Eligibility checks need a portfolio to match against. Use Bulk import to load them from the portfolio workbook or from completion certificates."
+            description="Eligibility checks need a portfolio to match against. Use Bulk import to load them from the portfolio Excel workbook."
             icon={FolderKanban}
           />
         ) : (

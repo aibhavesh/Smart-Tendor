@@ -156,6 +156,20 @@ class Settings(BaseSettings):
             return [o.strip() for o in v.split(",") if o.strip()]
         return v
 
+    @field_validator("debug", mode="before")
+    @classmethod
+    def _normalise_debug_mode(cls, v: object) -> object:
+        """Tolerate common host-level DEBUG labels without enabling debug mode.
+
+        Some Windows developer environments export ``DEBUG=release`` globally.
+        Pydantic otherwise rejects that value before the local ``.env`` file can
+        be used, preventing the API from starting. Release labels safely map to
+        ``False`` while regular boolean values keep Pydantic's normal parsing.
+        """
+        if isinstance(v, str) and v.strip().lower() in {"release", "production", "prod"}:
+            return False
+        return v
+
     @field_validator("database_url", mode="before")
     @classmethod
     def _select_async_postgres_driver(cls, v: object) -> object:

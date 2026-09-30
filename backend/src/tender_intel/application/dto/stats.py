@@ -16,6 +16,7 @@ from dataclasses import dataclass
 class OperationalStats:
     tenders_total: int
     tenders_by_status: dict[str, int]
+    eligibility_by_status: dict[str, int]
     past_projects_total: int
     #: Tenders analysed but not yet reviewed — the same definition the pending
     #: review queue uses (``ReviewService.pending``), kept in one place so the

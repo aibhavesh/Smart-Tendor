@@ -169,6 +169,28 @@ export interface ProjectImportResult {
   files: ProjectImportFile[];
 }
 
+/** An administrator-recorded certified company turnover figure for one financial year. */
+export interface CompanyTurnover {
+  id: string;
+  financial_year: string;
+  contractual_turnover: string;
+  certificate_document_id: string | null;
+  recorded_by: string | null;
+  recorded_at: string;
+}
+
+/** A certificate figure found by the turnover importer, before it is saved. */
+export interface TurnoverExtraction {
+  financial_year: string;
+  contractual_turnover: string;
+  source_file: string;
+}
+
+export interface TurnoverImportResult {
+  records: TurnoverExtraction[];
+  warnings: string[];
+}
+
 /**
  * Bulk retirement of expired tenders.
  *
@@ -392,6 +414,7 @@ export interface AuditLog {
 export interface OperationalStats {
   tenders_total: number;
   tenders_by_status: Record<string, number>;
+  eligibility_by_status: Record<string, number>;
   past_projects_total: number;
   /** Analysed but not yet reviewed — the same definition as GET /reviews/pending. */
   reviews_pending: number;

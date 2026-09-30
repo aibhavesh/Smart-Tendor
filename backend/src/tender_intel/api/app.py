@@ -13,22 +13,15 @@ from tender_intel.api.errors import register_exception_handlers
 from tender_intel.api.middleware import ObservabilityMiddleware
 from tender_intel.api.routers import (
     admin,
-    analyst,
     auth,
     company_turnover,
-    decisions,
     documents,
     eligibility,
     extraction,
     health,
-    matching,
-    metrics,
-    notifications,
-    observability,
     project_import,
     projects,
     retirement,
-    reviews,
     stats,
     tenders,
     work_types,
@@ -43,6 +36,11 @@ from tender_intel.infrastructure.workers.document_worker import (
     DocumentDownloadWorker,
     start_worker,
     stop_worker,
+)
+from tender_intel.infrastructure.workers.eligibility_workflow_worker import (
+    EligibilityWorkflowWorker,
+    start_workflow_worker,
+    stop_workflow_worker,
 )
 
 
@@ -62,6 +60,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         log.info("api.startup", environment=settings.environment.value, version=__version__)
         worker_task = None
+        workflow_task = None
         if settings.enable_document_worker:
             worker = DocumentDownloadWorker(
                 session_factory=container.session_factory(),
@@ -70,9 +69,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 poll_seconds=settings.download_poll_seconds,
             )
             worker_task = start_worker(worker)
+            workflow_task = start_workflow_worker(
+                EligibilityWorkflowWorker(
+                    session_factory=container.session_factory(),
+                    settings=settings,
+                    embeddings=container.embedding_provider(),
+                    vectors=container.vector_store(),
+                    poll_seconds=settings.download_poll_seconds,
+                )
+            )
         if settings.warm_embeddings_on_startup:
             await _warm_embeddings(container, settings)
         yield
+        if workflow_task is not None:
+            await stop_workflow_worker(workflow_task)
         if worker_task is not None:
             await stop_worker(worker_task)
         await container.engine().dispose()
@@ -85,7 +95,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.container = container
 
-    app.add_middleware(ObservabilityMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_allow_origins,
@@ -104,18 +113,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(projects.router)
     app.include_router(project_import.router)
     app.include_router(retirement.router)
-    app.include_router(notifications.router)
-    app.include_router(matching.router)
-    app.include_router(decisions.router)
-    app.include_router(analyst.router)
-    app.include_router(reviews.router)
     app.include_router(stats.router)
     app.include_router(admin.router)
     app.include_router(eligibility.router)
     app.include_router(work_types.router)
     app.include_router(company_turnover.router)
-    app.include_router(metrics.router)
-    app.include_router(observability.router)
 
     _instrument_tracing(app, settings)
     return app

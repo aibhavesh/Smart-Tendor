@@ -11,11 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tender_intel.domain.entities import BOQItem, Tender, TenderDocument, TenderMetadata
 from tender_intel.domain.enums.document_status import DocumentStatus
+from tender_intel.domain.enums.eligibility import EligibilityStatus
 from tender_intel.domain.enums.tender_status import TenderStatus
 from tender_intel.domain.value_objects.pagination import Page, PageRequest
 from tender_intel.infrastructure.db.orm import (
     BOQItemModel,
     TenderDocumentModel,
+    TenderEligibilityModel,
     TenderMetadataModel,
     TenderModel,
 )
@@ -51,6 +53,7 @@ class SqlAlchemyTenderRepository:
         page: PageRequest,
         *,
         status: TenderStatus | None = None,
+        eligibility_status: EligibilityStatus | None = None,
         search: str | None = None,
     ) -> Page[Tender]:
         conditions = []
@@ -63,6 +66,13 @@ class SqlAlchemyTenderRepository:
             )
         count_stmt = select(func.count(TenderModel.id))
         list_stmt = select(TenderModel).order_by(TenderModel.created_at.desc())
+        if eligibility_status is not None:
+            count_stmt = count_stmt.join(TenderEligibilityModel).where(
+                TenderEligibilityModel.status == eligibility_status.value
+            )
+            list_stmt = list_stmt.join(TenderEligibilityModel).where(
+                TenderEligibilityModel.status == eligibility_status.value
+            )
         for cond in conditions:
             count_stmt = count_stmt.where(cond)
             list_stmt = list_stmt.where(cond)

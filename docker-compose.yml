@@ -29,9 +29,11 @@ services:
   backend:
     build: ./backend
     restart: unless-stopped
-    # Copy .env.backend.example -> backend/.env first. In containers, set
-    # DATABASE_URL host to `postgres` (see the template's note).
+    # backend/.env is native-development friendly; Compose overrides service hosts.
     env_file: ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-tender}:${POSTGRES_PASSWORD:-tender}@postgres:5432/${POSTGRES_DB:-tender_intel}
+      QDRANT_URL: http://qdrant:6333
     depends_on:
       postgres:
         condition: service_healthy

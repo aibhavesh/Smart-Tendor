@@ -17,10 +17,11 @@ from tender_intel.application.dto.ingestion import (
 )
 from tender_intel.application.services.document_service import DocumentService
 from tender_intel.domain.entities import AuditLog, Tender
+from tender_intel.domain.enums.eligibility import EligibilityStatus
 from tender_intel.domain.enums.tender_status import TenderStatus
 from tender_intel.domain.exceptions import DuplicateEntityError, EntityNotFoundError
 from tender_intel.domain.interfaces.repositories import AuditLogRepository, TenderRepository
-from tender_intel.domain.value_objects.pagination import Page, PageRequest
+from tender_intel.domain.value_objects.pagination import MAX_LIMIT, Page, PageRequest
 
 
 def _to_decimal(value: Any) -> Decimal | None:
@@ -88,9 +89,12 @@ class TenderService:
         page: PageRequest,
         *,
         status: TenderStatus | None = None,
+        eligibility_status: EligibilityStatus | None = None,
         search: str | None = None,
     ) -> Page[Tender]:
-        return await self._tenders.list(page, status=status, search=search)
+        return await self._tenders.list(
+            page, status=status, eligibility_status=eligibility_status, search=search
+        )
 
     async def patch(
         self, tender_id: UUID, data: TenderPatch, *, actor_id: UUID | None = None
@@ -121,6 +125,24 @@ class TenderService:
         await self.get_or_404(tender_id)
         await self._tenders.delete(tender_id)
         await self._audit(actor_id, "tender.delete", tender_id)
+
+    async def delete_all(self, *, actor_id: UUID | None = None) -> int:
+        """Permanently remove all tenders in bounded batches.
+
+        Deleting through the repository preserves the database's cascade rules for
+        documents, extracted metadata, BOQ rows, reviews, and eligibility records.
+        Restarting each page at offset zero is intentional: every batch shrinks the
+        remaining result set.
+        """
+        deleted = 0
+        while True:
+            batch = await self._tenders.list(PageRequest(limit=MAX_LIMIT, offset=0))
+            if not batch.items:
+                return deleted
+            for tender in batch.items:
+                await self._tenders.delete(tender.id)
+                await self._audit(actor_id, "tender.delete", tender.id)
+                deleted += 1
 
     async def bulk_import(
         self, rows: Iterable[tuple[int, dict[str, Any]]], *, actor_id: UUID | None = None

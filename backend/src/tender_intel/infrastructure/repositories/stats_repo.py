@@ -9,13 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tender_intel.application.dto.admin import PlatformStats
 from tender_intel.application.dto.stats import OperationalStats
-from tender_intel.domain.enums.review import ReviewKind
-from tender_intel.domain.enums.tender_status import TenderStatus
 from tender_intel.infrastructure.db.orm import (
     PastProjectModel,
     TenderDocumentModel,
+    TenderEligibilityModel,
     TenderModel,
-    TenderReviewModel,
     UserModel,
 )
 
@@ -36,24 +34,20 @@ class SqlAlchemyStatsRepository:
             users_active=users_active,
             users_by_role=users_by_role,
             past_projects_total=await self._count(PastProjectModel),
-            # Verdicts only. Corrections share this table but are not decisions,
-            # and counting them here would report reviews nobody performed.
-            reviews_total=await self._count(
-                TenderReviewModel, TenderReviewModel.kind == ReviewKind.VERDICT.value
-            ),
+            reviews_total=0,
             documents_total=await self._count(TenderDocumentModel),
         )
 
     async def operational_stats(self) -> OperationalStats:
         """Aggregates any authenticated user may see (no user or account figures)."""
         tenders_by_status = await self._group_count(TenderModel.status)
+        eligibility_by_status = await self._group_count(TenderEligibilityModel.status)
         return OperationalStats(
             tenders_total=sum(tenders_by_status.values()),
             tenders_by_status=tenders_by_status,
+            eligibility_by_status=eligibility_by_status,
             past_projects_total=await self._count(PastProjectModel),
-            # Pending review == analysed but not yet reviewed; a review advances the
-            # tender to REVIEWED, so the ANALYZED bucket *is* the queue depth.
-            reviews_pending=tenders_by_status.get(TenderStatus.ANALYZED.value, 0),
+            reviews_pending=0,
         )
 
     async def _count(self, model: Any, *conditions: Any) -> int:

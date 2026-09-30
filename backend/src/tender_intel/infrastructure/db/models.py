@@ -6,7 +6,6 @@ from __future__ import annotations
 
 from tender_intel.infrastructure.db.base import Base
 from tender_intel.infrastructure.db.orm import (
-    AuditLogModel,
     BOQItemModel,
     CompanyTurnoverModel,
     PastProjectModel,
@@ -19,7 +18,6 @@ from tender_intel.infrastructure.db.orm import (
     TenderEligibilityWorkTypeModel,
     TenderMetadataModel,
     TenderModel,
-    TenderReviewModel,
     UserModel,
     UserSessionModel,
     WorkTypeAliasModel,
@@ -27,7 +25,6 @@ from tender_intel.infrastructure.db.orm import (
 )
 
 __all__ = [
-    "AuditLogModel",
     "BOQItemModel",
     "Base",
     "CompanyTurnoverModel",
@@ -41,7 +38,6 @@ __all__ = [
     "TenderEligibilityWorkTypeModel",
     "TenderMetadataModel",
     "TenderModel",
-    "TenderReviewModel",
     "UserModel",
     "UserSessionModel",
     "WorkTypeAliasModel",

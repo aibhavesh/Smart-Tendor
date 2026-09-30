@@ -22,13 +22,8 @@ import { describeError } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { canActAs } from "@/lib/roles";
 import { useAuth } from "@/lib/auth";
-import { DASHBOARD_STATUSES, fetchDashboard, type DashboardData } from "@/lib/dashboard";
+import { fetchDashboard, type DashboardData } from "@/lib/dashboard";
 import { TenderStatusTag } from "@/components/tenders/TenderStatusTag";
-import {
-  TENDER_STATUS_LABEL,
-  TENDER_STATUS_SHORT,
-} from "@/lib/tender-status";
-import type { TenderStatus } from "@/lib/types";
 
 /** A count that failed to load renders as UNKNOWN, never as a misleading zero. */
 function StatTile({ label, value }: { label: string; value: number | null | undefined }) {
@@ -79,16 +74,16 @@ function DashboardBody() {
   if (error) return <ErrorState detail={error} onRetry={() => setReloadKey((k) => k + 1)} />;
   if (!data || !role) return <SkeletonRows rows={7} />;
 
-  const isManager = canActAs(role, "MANAGER");
   const isAdmin = canActAs(role, "ADMIN");
 
-  // Short labels on the axis; the code rides along in the tooltip so the bar can still be
-  // matched to the status filter on the tender list.
-  const chartData = DASHBOARD_STATUSES.map((status) => ({
-    name: TENDER_STATUS_SHORT[status],
-    code: status,
-    value: data.stats.tenders_by_status[status] ?? 0,
-  }));
+  const chartData = [
+    { name: "No doc", value: data.stats.tenders_by_status.REGISTERED ?? 0 },
+    { name: "Doc in", value: data.stats.tenders_by_status.DOWNLOADED ?? 0 },
+    { name: "Extracted", value: data.stats.tenders_by_status.PARSED ?? 0 },
+    { name: "Eligible", value: data.stats.eligibility_by_status.ELIGIBLE ?? 0 },
+    { name: "Not eligible", value: data.stats.eligibility_by_status.NOT_ELIGIBLE ?? 0 },
+    { name: "Needs review", value: data.stats.eligibility_by_status.INDETERMINATE ?? 0 },
+  ];
 
   return (
     <div className="flex flex-col gap-6">
@@ -111,15 +106,10 @@ function DashboardBody() {
 
       {/* Role-appropriate KPIs: the same board would be either useless to a viewer or
           missing the queue a manager opens this screen for. */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <StatTile label="Tenders" value={data.stats.tenders_total} />
-        <StatTile label="Awaiting analysis" value={data.stats.tenders_by_status.PARSED ?? 0} />
-        <StatTile label="Analysed" value={data.stats.tenders_by_status.ANALYZED ?? 0} />
-        {isManager ? (
-          <StatTile label="Pending review" value={data.stats.reviews_pending} />
-        ) : (
-          <StatTile label="Past projects" value={data.stats.past_projects_total} />
-        )}
+        <StatTile label="Eligible" value={data.stats.eligibility_by_status.ELIGIBLE ?? 0} />
+        <StatTile label="Not eligible" value={data.stats.eligibility_by_status.NOT_ELIGIBLE ?? 0} />
       </div>
 
       {isAdmin && data.platform ? (
@@ -133,8 +123,8 @@ function DashboardBody() {
 
       <Card>
         <CardHeader
-          title="Tenders by status"
-          description="Nothing is analysed before it is parsed — the lifecycle enforces the order."
+          title="Tender workflow and eligibility"
+          description="Workflow stages and screening outcomes. A tender can appear in both groups."
         />
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
@@ -161,12 +151,7 @@ function DashboardBody() {
                 cursor={{ fill: CHART_THEME.grid, fillOpacity: 0.06 }}
                 contentStyle={CHART_THEME.tooltip.contentStyle}
                 labelStyle={CHART_THEME.tooltip.labelStyle}
-                labelFormatter={(_label, payload) => {
-                  const row = payload?.[0]?.payload as { code?: TenderStatus } | undefined;
-                  return row?.code
-                    ? `${TENDER_STATUS_LABEL[row.code]} (${row.code})`
-                    : String(_label);
-                }}
+                labelFormatter={(label) => String(label)}
               />
               <Bar dataKey="value" radius={[6, 6, 0, 0]}>
                 {chartData.map((entry, i) => (

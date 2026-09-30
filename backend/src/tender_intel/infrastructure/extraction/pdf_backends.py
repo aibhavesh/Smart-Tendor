@@ -33,6 +33,29 @@ class PyMuPDFTextExtractor:
         return "\n".join(parts)
 
 
+class OcrPdfTextExtractor:
+    """Extract text from an image-only PDF using the local Tesseract engine.
+
+    Certificates are frequently scanned.  PDF text extractors correctly return
+    an empty string for those files, so OCR is deliberately a fallback rather
+    than the default path for every document.
+    """
+
+    def extract_text(self, content: bytes) -> str:
+        import fitz  # PyMuPDF
+        import pytesseract
+        from PIL import Image
+
+        parts: list[str] = []
+        with fitz.open(stream=content, filetype="pdf") as doc:
+            for page in doc:
+                # 2x is a good balance for small certificate text and upload time.
+                image_bytes = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False).tobytes("png")
+                with Image.open(io.BytesIO(image_bytes)) as image:
+                    parts.append(pytesseract.image_to_string(image, config="--psm 6"))
+        return "\n".join(parts)
+
+
 class PdfPlumberBOQExtractor:
     def extract_tables(self, content: bytes) -> list[Table]:
         import pdfplumber

@@ -1,6 +1,6 @@
 """Certified turnover administration (feature spec §2, §8).
 
-ADMIN only, one record per financial year, every mutation audited. These figures
+MANAGER and above, one record per financial year, every mutation audited. These figures
 decide the financial criterion for every tender at once, so a wrong entry is not
 a local error.
 

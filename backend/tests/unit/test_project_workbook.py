@@ -161,6 +161,12 @@ def test_the_heading_map_covers_the_fields_stage_b_depends_on():
     assert {"name", "work_value", "completion_certificate_date", "loa_reference"} <= targets
 
 
+def test_the_supplied_portfolio_heading_variants_map_to_eligibility_fields():
+    """The 7-year portfolio uses these exact headings, including ``Dated``."""
+    assert PROJECT_HEADER_ALIASES["final loa amount"] == "work_value"
+    assert PROJECT_HEADER_ALIASES["completion certificate dated"] == "completion_certificate_date"
+
+
 def test_text_coercion_collapses_and_blanks_to_none():
     assert coerce_text("  Mumbai\nGPON ") == "Mumbai GPON"
     assert coerce_text("   ") is None

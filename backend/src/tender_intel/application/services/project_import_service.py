@@ -1,13 +1,11 @@
-"""Bulk import of past-project documents (PDF and XLSX).
+"""Bulk import of past-project Excel workbooks.
 
 One operation, many files, per-file isolation: a file that fails is reported and
 the batch continues. Within a workbook the same holds per row.
 
 Composition rather than reimplementation. Workbook rows come from
 :func:`parse_project_rows`, which is the tender workbook reader with a
-past-project heading map. Single documents go through
-``PastProjectService.create_from_document``, the extractor that already existed.
-Creation itself goes through ``PastProjectService.create``, so vector indexing
+past-project heading map. Creation goes through ``PastProjectService.create``, so vector indexing
 and the per-project audit entry happen exactly as they do for a hand-entered
 project.
 
@@ -62,9 +60,7 @@ from tender_intel.infrastructure.project_workbook import (
 _log = get_logger(__name__)
 
 #: Extensions handled as a whole workbook of many projects.
-WORKBOOK_SUFFIXES = (".xlsx", ".xlsm")
-#: Extensions handled as one document describing one project.
-DOCUMENT_SUFFIXES = (".pdf",)
+WORKBOOK_SUFFIXES = (".xlsx",)
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,7 +89,7 @@ class ProjectImportService:
 
     async def import_files(
         self,
-        files: list[tuple[str, bytes, str | None]],
+        files: list[tuple[str, bytes]],
         *,
         auto_tag: bool = True,
         actor_id: UUID,
@@ -105,9 +101,9 @@ class ProjectImportService:
         result = ProjectImportResult()
         candidates = await self._candidates() if auto_tag else []
 
-        for filename, content, mime_type in files:
+        for filename, content in files:
             result.files.append(
-                await self._import_one(filename, content, mime_type, candidates, actor_id)
+                await self._import_one(filename, content, candidates, actor_id)
             )
 
         await self._audit_batch(result, actor_id, actor_role, ip, user_agent, auto_tag)
@@ -119,7 +115,6 @@ class ProjectImportService:
         self,
         filename: str,
         content: bytes,
-        mime_type: str | None,
         candidates: list[WorkTypeCandidate],
         actor_id: UUID,
     ) -> FileImportResult:
@@ -127,17 +122,13 @@ class ProjectImportService:
         try:
             if lowered.endswith(WORKBOOK_SUFFIXES):
                 return await self._import_workbook(filename, content, candidates, actor_id)
-            if lowered.endswith(DOCUMENT_SUFFIXES):
-                return await self._import_document(
-                    filename, content, mime_type, candidates, actor_id
-                )
         except Exception as exc:  # one bad file must not end the batch
             _log.warning("project_import.file_failed", filename=filename, error=str(exc))
             return FileImportResult(filename, ImportOutcome.ERROR, str(exc))
         return FileImportResult(
             filename,
             ImportOutcome.ERROR,
-            "unsupported file type: expected .pdf or .xlsx",
+            "unsupported file type: past-project imports require an Excel workbook (.xlsx)",
         )
 
     async def _import_workbook(
@@ -213,21 +204,6 @@ class ProjectImportService:
             # rather than silently producing a run of bogus row errors.
             return ProjectRowResult(row_number, name, ImportOutcome.ERROR, str(exc))
         return await self._finish(row_number, project, candidates, actor_id)
-
-    async def _import_document(
-        self,
-        filename: str,
-        content: bytes,
-        mime_type: str | None,
-        candidates: list[WorkTypeCandidate],
-        actor_id: UUID,
-    ) -> FileImportResult:
-        file_result = FileImportResult(filename, ImportOutcome.CREATED)
-        project = await self._projects.create_from_document(
-            filename=filename, content=content, mime_type=mime_type, actor_id=actor_id
-        )
-        file_result.rows.append(await self._finish(1, project, candidates, actor_id))
-        return file_result
 
     # --- work-type linking --------------------------------------------------
 

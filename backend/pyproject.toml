@@ -34,6 +34,8 @@ dependencies = [
     # --- Extraction (Phase 4) ---
     "pdfplumber>=0.11",
     "pymupdf>=1.24",
+    "pytesseract>=0.3.13", # OCR fallback for scanned turnover certificates
+    "pillow>=10.4",
     "openpyxl>=3.1",          # Excel bulk import
     # --- DI ---
     "dependency-injector>=4.42",
@@ -105,6 +107,7 @@ module = [
     "authlib.*",
     "openpyxl.*",
     "psutil.*",
+    "pytesseract.*",
 ]
 ignore_missing_imports = true
 

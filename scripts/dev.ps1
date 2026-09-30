@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+    #Requires -Version 5.1
 <#
 .SYNOPSIS
     Local development launcher for the Tender Intelligence Platform.

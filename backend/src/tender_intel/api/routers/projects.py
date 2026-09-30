@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Query, Response, UploadFile, status
+from fastapi import APIRouter, Depends, Query, Response, status
 
 from tender_intel.api.dependencies.auth import get_current_user, require_role
 from tender_intel.api.dependencies.services import get_past_project_service
 from tender_intel.api.schemas.common import PageResponse
 from tender_intel.api.schemas.past_project import (
     BackfillResponse,
+    PastProjectBulkDeleteResponse,
     PastProjectCreateRequest,
     PastProjectPatchRequest,
     PastProjectResponse,
@@ -33,24 +34,6 @@ async def create_project(
     return PastProjectResponse.from_entity(project)
 
 
-@router.post(
-    "/from-document", status_code=status.HTTP_201_CREATED, response_model=PastProjectResponse
-)
-async def create_project_from_document(
-    file: UploadFile = File(...),
-    service: PastProjectService = Depends(get_past_project_service),
-    user: User = Depends(require_role(UserRole.EMPLOYEE)),
-) -> PastProjectResponse:
-    content = await file.read()
-    project = await service.create_from_document(
-        filename=file.filename or "upload",
-        content=content,
-        mime_type=file.content_type,
-        actor_id=user.id,
-    )
-    return PastProjectResponse.from_entity(project)
-
-
 @router.get("", response_model=PageResponse[PastProjectResponse])
 async def list_projects(
     service: PastProjectService = Depends(get_past_project_service),
@@ -60,6 +43,17 @@ async def list_projects(
 ) -> PageResponse[PastProjectResponse]:
     page = await service.list(PageRequest(limit=limit, offset=offset))
     return PageResponse.of(page, [PastProjectResponse.from_entity(p) for p in page.items])
+
+
+@router.delete("", response_model=PastProjectBulkDeleteResponse)
+async def delete_all_projects(
+    service: PastProjectService = Depends(get_past_project_service),
+    user: User = Depends(require_role(UserRole.MANAGER)),
+) -> PastProjectBulkDeleteResponse:
+    """Permanently remove the entire past-project registry."""
+    return PastProjectBulkDeleteResponse(
+        deleted=await service.delete_all(actor_id=user.id)
+    )
 
 
 @router.get("/{project_id}", response_model=PastProjectResponse)

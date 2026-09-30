@@ -1,11 +1,15 @@
 """Taxonomy and certified-turnover administration (feature spec §8).
 
-Mutations are ADMIN, reads of the taxonomy are level 20, turnover is ADMIN
-throughout. Work types deactivate rather than delete, and every mutation is
-audited.
+Taxonomy mutations are ADMIN, reads of the taxonomy are level 20, and certified
+turnover is MANAGER and above. Work types deactivate rather than delete, and
+every mutation is audited.
 """
 
 from __future__ import annotations
+
+from io import BytesIO
+
+from openpyxl import Workbook
 
 from tender_intel.domain.enums.roles import UserRole
 from tests.integration.helpers import auth_headers
@@ -225,9 +229,87 @@ async def test_a_malformed_financial_year_is_refused(client, app_db):
     assert response.status_code == 422
 
 
-async def test_turnover_is_admin_only(client, app_db):
-    headers = await _employee(client, app_db)
-    assert (await client.get(f"{BASE}/company-turnover", headers=headers)).status_code == 403
+async def test_turnover_requires_manager_or_higher(client, app_db):
+    employee = await _employee(client, app_db)
+    assert (await client.get(f"{BASE}/company-turnover", headers=employee)).status_code == 403
+
+    manager = await auth_headers(
+        client, app_db, email="manager@example.com", role=UserRole.MANAGER
+    )
+    created = await client.post(
+        f"{BASE}/company-turnover",
+        json={"financial_year": "2024-25", "contractual_turnover": "1000000"},
+        headers=manager,
+    )
+    assert created.status_code == 201
+
+
+async def test_manager_can_extract_turnover_from_excel(client, app_db):
+    manager = await auth_headers(
+        client, app_db, email="manager@example.com", role=UserRole.MANAGER
+    )
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["Financial Year", "Certified Turnover"])
+    sheet.append(["2023-24", 2500000])
+    sheet.append(["2024-25", 3500000])
+    content = BytesIO()
+    workbook.save(content)
+
+    response = await client.post(
+        f"{BASE}/company-turnover/import",
+        files={
+            "files": (
+                "turnover.xlsx",
+                content.getvalue(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+        headers=manager,
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["records"] == [
+        {
+            "financial_year": "2024-25",
+            "contractual_turnover": "3500000",
+            "source_file": "turnover.xlsx",
+        },
+        {
+            "financial_year": "2023-24",
+            "contractual_turnover": "2500000",
+            "source_file": "turnover.xlsx",
+        },
+    ]
+
+
+async def test_manager_can_extract_turnover_from_horizontal_excel_table(client, app_db):
+    manager = await auth_headers(
+        client, app_db, email="manager@example.com", role=UserRole.MANAGER
+    )
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["Year", "2022-23", "2023-24", "2024-25"])
+    sheet.append(["Certified turnover", 1000000, 2000000, 3000000])
+    content = BytesIO()
+    workbook.save(content)
+
+    response = await client.post(
+        f"{BASE}/company-turnover/import",
+        files={
+            "files": (
+                "horizontal.xlsx",
+                content.getvalue(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+        headers=manager,
+    )
+    assert response.status_code == 200, response.text
+    assert [record["financial_year"] for record in response.json()["records"]] == [
+        "2024-25",
+        "2023-24",
+        "2022-23",
+    ]
 
 
 # --------------------------------------------------------------------------- #

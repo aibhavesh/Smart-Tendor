@@ -36,6 +36,7 @@ from tender_intel.domain.entities.work_type import (
 )
 from tender_intel.domain.enums.document_status import DocumentStatus
 from tender_intel.domain.enums.roles import UserRole
+from tender_intel.domain.enums.eligibility import EligibilityStatus
 from tender_intel.domain.enums.tender_status import TenderStatus
 from tender_intel.domain.value_objects.pagination import Page, PageRequest
 
@@ -78,6 +79,7 @@ class TenderRepository(Protocol):
         page: PageRequest,
         *,
         status: TenderStatus | None = None,
+        eligibility_status: EligibilityStatus | None = None,
         search: str | None = None,
     ) -> Page[Tender]: ...
     async def list_closing_before(self, cutoff: date, limit: int) -> Sequence[Tender]: ...

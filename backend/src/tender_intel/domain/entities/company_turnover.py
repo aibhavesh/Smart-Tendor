@@ -5,7 +5,7 @@ certificate. They are not derived from balance sheets by automated extraction,
 and they are not the same figure as Revenue from Operations — recording the wrong
 one would understate or overstate the company against every tender at once.
 
-An administrator maintains them, one row per year, with the certificate attached
+An authorised manager maintains them, one row per year, with the certificate attached
 and the change audited.
 """
 

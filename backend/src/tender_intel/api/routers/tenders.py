@@ -11,12 +11,14 @@ from tender_intel.api.dependencies.services import get_tender_service
 from tender_intel.api.schemas.common import PageResponse
 from tender_intel.api.schemas.tender import (
     BulkImportResponse,
+    TenderBulkDeleteResponse,
     TenderCreateRequest,
     TenderPatchRequest,
     TenderResponse,
 )
 from tender_intel.application.services.tender_service import TenderService
 from tender_intel.domain.entities import User
+from tender_intel.domain.enums.eligibility import EligibilityStatus
 from tender_intel.domain.enums.roles import UserRole
 from tender_intel.domain.enums.tender_status import TenderStatus
 from tender_intel.domain.value_objects.pagination import MAX_LIMIT, PageRequest
@@ -42,10 +44,14 @@ async def list_tenders(
     limit: int = Query(default=50, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
     status_filter: TenderStatus | None = Query(default=None, alias="status"),
+    eligibility_status: EligibilityStatus | None = Query(default=None, alias="eligibility"),
     search: str | None = Query(default=None),
 ) -> PageResponse[TenderResponse]:
     page = await service.list(
-        PageRequest(limit=limit, offset=offset), status=status_filter, search=search
+        PageRequest(limit=limit, offset=offset),
+        status=status_filter,
+        eligibility_status=eligibility_status,
+        search=search,
     )
     return PageResponse.of(page, [TenderResponse.from_entity(t) for t in page.items])
 
@@ -78,6 +84,15 @@ async def delete_tender(
 ) -> Response:
     await service.delete(tender_id, actor_id=user.id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("", response_model=TenderBulkDeleteResponse)
+async def delete_all_tenders(
+    service: TenderService = Depends(get_tender_service),
+    user: User = Depends(require_role(UserRole.MANAGER)),
+) -> TenderBulkDeleteResponse:
+    """Permanently remove every tender and all tender-linked records."""
+    return TenderBulkDeleteResponse(deleted=await service.delete_all(actor_id=user.id))
 
 
 @router.post("/import", response_model=BulkImportResponse)

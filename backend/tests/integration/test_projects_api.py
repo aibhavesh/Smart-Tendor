@@ -34,19 +34,32 @@ async def test_project_crud(client, app_db):
     assert (await client.get(f"/projects/{body['id']}", headers=headers)).status_code == 404
 
 
-async def test_create_from_document_extracts_attributes(client, app_db):
+async def test_manager_can_delete_all_projects(client, app_db):
+    manager = await auth_headers(client, app_db, email="manager@example.com", role=UserRole.MANAGER)
+    first = await client.post("/projects", json={"name": "First"}, headers=manager)
+    second = await client.post("/projects", json={"name": "Second"}, headers=manager)
+
+    response = await client.delete("/projects", headers=manager)
+    assert response.status_code == 200
+    assert response.json() == {"deleted": 2}
+    assert (await client.get("/projects", headers=manager)).json()["total"] == 0
+
+
+async def test_delete_all_requires_a_manager(client, app_db):
+    employee = await auth_headers(client, app_db, email="employee@example.com", role=UserRole.EMPLOYEE)
+    response = await client.delete("/projects", headers=employee)
+    assert response.status_code == 403
+
+
+async def test_document_project_creation_endpoint_is_not_exposed(client, app_db):
     headers = await auth_headers(client, app_db)
-    doc = b"Name of Work: Metro Rail Phase 2\nEstimated Cost: Rs. 5 Crore\nLocation: Indore\n"
     resp = await client.post(
         "/projects/from-document",
-        files={"file": ("project.txt", doc, "text/plain")},
         headers=headers,
     )
-    assert resp.status_code == 201
-    body = resp.json()
-    assert body["name"] == "Metro Rail Phase 2"
-    assert body["work_value"] == "50000000.00"
-    assert body["location"] == "Indore"
+    # ``/projects/{project_id}`` still owns the path shape for reads/updates,
+    # so a removed POST route is correctly rejected as method-not-allowed.
+    assert resp.status_code == 405
 
 
 async def test_employee_can_create_project(client, app_db):
