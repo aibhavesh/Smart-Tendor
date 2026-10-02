@@ -5,13 +5,16 @@ The repository root `netlify.toml` sets this directory as the build base, runs
 
 ## Build variables
 
-Set these before the first production deploy:
+Set these before the first production deploy when needed:
 
 ```dotenv
 NEXT_PUBLIC_API_BASE_URL=https://your-api.onrender.com
 NEXT_PUBLIC_GOOGLE_CLIENT_ID=
 NEXT_PUBLIC_HERO_VIDEO=/video/hero.mp4
 ```
+
+`NEXT_PUBLIC_API_BASE_URL` is optional and defaults to `/api` when omitted, which
+works when Netlify rewrites or proxies `/api` to the backend.
 
 Google sign-in is optional. When enabled, use the same client ID in the backend
 `GOOGLE_CLIENT_ID` setting and add the Netlify/custom origins to the OAuth Web

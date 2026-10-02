@@ -1,19 +1,14 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Fustat, Inter, Outfit } from "next/font/google";
 import "./globals.css";
 import { BRAND_NAME } from "@/components/brand/Wordmark";
 import { Providers } from "./providers";
 import { THEME_STORAGE_KEY } from "@/lib/theme-key";
 
 /*
- * All three faces are variable fonts, so no `weight` is declared — the full
- * range the prompt asks for (Outfit 400–900, Fustat 500–800, Inter 400–700)
- * comes from the variable axis. next/font self-hosts these at build time.
+ * Font variables are defined in globals.css with local fallbacks to keep builds
+ * deterministic in environments where Google Fonts cannot be fetched.
  */
-const inter = Inter({ subsets: ["latin"], variable: "--ff-inter", display: "swap" });
-const outfit = Outfit({ subsets: ["latin"], variable: "--ff-outfit", display: "swap" });
-const fustat = Fustat({ subsets: ["latin"], variable: "--ff-fustat", display: "swap" });
 
 export const metadata: Metadata = {
   // Company first, product second: the tab and any shared link lead with the name on
@@ -43,7 +38,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${inter.variable} ${outfit.variable} ${fustat.variable} h-full antialiased`}
+      className="h-full antialiased"
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
