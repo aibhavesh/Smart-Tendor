@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+:root {
+  --ff-inter: "Inter";
+  --ff-outfit: "Outfit";
+  --ff-fustat: "Fustat";
+}
+
 /*
  * ============================================================================
  * THE TOKEN FILE — the only place in the frontend where a literal colour value
@@ -10,9 +16,8 @@
  * not designed in the abstract. If a token is not used by the landing page, it
  * does not belong here.
  *
- * Font faces come from next/font/google in layout.tsx, which self-hosts them at
- * build time. The --ff-* variables are its output; the @theme --font-* entries
- * are the Tailwind-facing names, so the two must not collide.
+ * The --ff-* variables are defined at :root and can resolve to local fonts when
+ * available. The @theme --font-* entries are the Tailwind-facing names.
  * ============================================================================
  */
 

@@ -317,7 +317,7 @@ Required production values are:
 | Service | Required | Conditional or optional |
 | --- | --- | --- |
 | Backend | `ENVIRONMENT=production`, `DATABASE_URL`, `CORS_ALLOW_ORIGINS`, `JWT_SECRET`, `ALLOWED_EMAIL_DOMAINS` | `QDRANT_URL` and `QDRANT_API_KEY` for Qdrant Cloud; `METRICS_PASSWORD` when metrics are enabled; `BOOTSTRAP_SUPER_ADMIN_EMAIL` for first-admin provisioning; Google, Gemini, Sentry, and OTLP settings are optional. |
-| Frontend build | `NEXT_PUBLIC_API_BASE_URL` | `NEXT_PUBLIC_GOOGLE_CLIENT_ID` and `NEXT_PUBLIC_HERO_VIDEO` are optional. |
+| Frontend build | None (defaults to `/api`) | `NEXT_PUBLIC_API_BASE_URL` overrides the API origin; `NEXT_PUBLIC_GOOGLE_CLIENT_ID` and `NEXT_PUBLIC_HERO_VIDEO` are optional. |
 | Docker Compose | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `NEXT_PUBLIC_API_BASE_URL` | Public Google and hero-video build values are optional. |
 
 All supported settings, defaults, and safe placeholders are listed in the three

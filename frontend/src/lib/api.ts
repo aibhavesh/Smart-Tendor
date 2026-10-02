@@ -9,14 +9,10 @@ import { clearTokens, getAccessToken, refreshAccessToken } from "./auth-store";
  */
 
 const configuredApiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
-if (!configuredApiBase) {
-  throw new Error(
-    "NEXT_PUBLIC_API_BASE_URL is required. Set it before running next dev or next build.",
-  );
-}
+const defaultApiBase = "/api";
 
 // Trim a trailing slash so every request below has exactly one path separator.
-export const API_BASE = configuredApiBase.replace(/\/+$/, "");
+export const API_BASE = (configuredApiBase || defaultApiBase).replace(/\/+$/, "");
 
 export class ApiError extends Error {
   constructor(
