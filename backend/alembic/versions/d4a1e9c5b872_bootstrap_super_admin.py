@@ -62,13 +62,20 @@ def upgrade() -> None:
     if already_a_user is not None:
         return
 
+    # The id must be bound through sa.Uuid, not as a pre-formatted string.
+    # `id` is declared sa.Uuid(), and that type renders differently per dialect: 32-char
+    # hex with no dashes on SQLite, native uuid on PostgreSQL. Passing str(uuid4()) wrote
+    # the 36-char dashed form, which SQLite stored verbatim into a CHAR(32) column. The
+    # row then existed but no ORM primary-key lookup could ever match it, because the Uuid
+    # type binds the undashed hex — so consuming the seed raised "not found for update" and
+    # the first administrator could not be created on SQLite at all.
     connection.execute(
         sa.text(
             "INSERT INTO role_assignments "
             "(id, email, role, assigned_by, assigned_at, consumed_at, consumed_user_id) "
             "VALUES (:id, :email, 'SUPER_ADMIN', NULL, :assigned_at, NULL, NULL)"
-        ),
-        {"id": str(uuid.uuid4()), "email": email, "assigned_at": datetime.now(UTC)},
+        ).bindparams(sa.bindparam("id", type_=sa.Uuid())),
+        {"id": uuid.uuid4(), "email": email, "assigned_at": datetime.now(UTC)},
     )
 
 

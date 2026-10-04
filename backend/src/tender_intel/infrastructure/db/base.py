@@ -13,7 +13,12 @@ from datetime import UTC, datetime
 from sqlalchemy import DateTime, MetaData, TypeDecorator
 from sqlalchemy.engine import Dialect
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy.sql import func
+
+
+def _utc_now() -> datetime:
+    """Timezone-aware UTC now, for column defaults and onupdate stamps."""
+    return datetime.now(UTC)
+
 
 # Explicit naming convention so Alembic autogenerate produces stable, named
 # constraints (required for reliable downgrades).
@@ -48,9 +53,22 @@ class Base(DeclarativeBase):
 
 
 class TimestampMixin:
-    created_at: Mapped[datetime] = mapped_column(
-        UTCDateTime, server_default=func.now(), nullable=False
-    )
+    """``created_at`` / ``updated_at`` stamped from Python, not from the database.
+
+    These used to be ``server_default=func.now()``, which is Postgres-only syntax:
+    SQLite has no ``now()`` function, so any INSERT that omitted the columns (every
+    one of them, since the ORM relies on the server default) failed with
+    ``sqlite3.OperationalError: unknown function: now()``. Only ``User`` escaped it,
+    because user_to_model() in repositories/mappers.py already stamps both values
+    from the domain entity for exactly this reason.
+
+    Python-side defaults fix it for every entity at once and on any dialect. The
+    columns keep the ``now()`` server default in the existing schema, but the ORM
+    now always supplies a value, so that default is never evaluated. Timestamps stay
+    timezone-aware UTC, which UTCDateTime normalises consistently either way.
+    """
+
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=_utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
-        UTCDateTime, server_default=func.now(), onupdate=func.now(), nullable=False
+        UTCDateTime, default=_utc_now, onupdate=_utc_now, nullable=False
     )
