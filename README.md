@@ -247,8 +247,8 @@ offline fallback over failure, an audit entry on every state change.
 | `/dashboard` | Portfolio overview and pending work. |
 | `/tenders`, `/tenders/[id]`, `/tenders/upload` | List, full analysis detail, and ingestion. |
 | `/projects` | Past-project corpus that similarity matching scores against. |
-| `/reviews` | Pending verdicts queue. |
-| `/admin`, `/admin/audit-logs`, `/admin/role-assignments` | Administration. |
+| `/turnover` | Company turnover evidence used by eligibility screening. |
+| `/admin`, `/admin/role-assignments` | Administration. |
 | `/profile` | The signed-in user's account. |
 | `/design/tokens`, `/design/primitives` | Live theme and component reference. `noindex`, but publicly served. |
 
@@ -400,6 +400,7 @@ part of CI.
 | `conformance-{static,runtime,states}.mjs` | Source structure, rendered-DOM contrast, and loading / empty / error states. |
 | `e2e-{live,roles,crud,lifecycle}.mjs` | The app and a real backend agree. |
 | `test-hero-fallback.mjs` | The landing page survives the hero video failing to load. |
+| `verify-deploy.mjs <site> <apiOrigin>` | A deployed build renders, hydrates, guards routes, and dials the configured API origin. |
 
 All except `check-contrast.mjs` need `npm run start` on `:3000`; the `e2e-*`
 scripts also need a seeded backend on `:8000`. Playwright browsers are a
@@ -511,6 +512,11 @@ after one week and deleted after four weeks unless reactivated.
    NEXT_PUBLIC_HERO_VIDEO=/video/hero.mp4
    ```
 
+   `NEXT_PUBLIC_API_BASE_URL` must be the **bare origin** ΓÇö scheme and host only, no
+   trailing `/api`. The backend mounts routers under two prefixes (`/tenders/...` and
+   `/api/v1/tenders/...`) and the client appends both verbatim, so only the bare origin
+   resolves both. The `/api` suffix is a Docker Compose convention that nginx strips.
+
    Record the final `https://...netlify.app` URL. `NEXT_PUBLIC_*` values are
    compiled into the browser bundle, so every change requires a new frontend build.
 5. **Lock down CORS.** Replace Render's temporary `CORS_ALLOW_ORIGINS` value with
@@ -523,8 +529,19 @@ after one week and deleted after four weeks unless reactivated.
 7. **Post-deployment verification.** Confirm the API `/health` returns HTTP 200;
    confirm an `OPTIONS /auth/login` request from the frontend receives the exact
    `Access-Control-Allow-Origin`; register the bootstrap address; create a tender;
-   and verify dashboard, audit, and role-protected screens. Expect the first API
+   and verify dashboard, admin, and role-protected screens. Expect the first API
    request after idle time to wait for Render's cold start.
+
+   Then run the bundled browser check against the live site:
+
+   ```bash
+   cd frontend
+   node scripts/verify-deploy.mjs https://your-site.netlify.app https://your-api.onrender.com
+   ```
+
+   It proves the page renders and hydrates without console errors, that anonymous
+   `/dashboard` redirects to `/login`, and that every API call is dialled at the
+   configured origin with no doubled slashes.
 
 ### Production secrets
 

@@ -1,3 +1,10 @@
+# Netlify configuration ΓÇö single source of truth for the frontend.
+#
+# The Next.js app lives in `frontend/`, so this file sits at the repository root and
+# points the build at that directory. Do NOT add a second netlify.toml inside
+# `frontend/`: Netlify resolves config from the base directory first and the repo root
+# second, so two files make the effective config depend on lookup order.
+
 [build]
   base = "frontend"
   command = "npm run build"
@@ -5,6 +12,40 @@
 
 [build.environment]
   NODE_VERSION = "22"
+  # Next.js 16 requires Node >= 20.9; 22 matches .nvmrc and is what CI builds with.
+  # Build-time deps (typescript, @tailwindcss/postcss) live in devDependencies and are
+  # needed during `next build`, so dev deps must be installed.
+  NPM_FLAGS = "--include=dev"
+  NEXT_TELEMETRY_DISABLED = "1"
+  # Roll a live deploy out consistently: in-flight client requests are pinned to the
+  # deployment that served their page, so a release cannot 404 its own assets mid-session.
+  NETLIFY_NEXT_SKEW_PROTECTION = "true"
 
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
+# Intentionally no [[plugins]] block.
+#
+# This is a Next.js 16 application. Netlify provisions the correct runtime through its
+# OpenNext adapter automatically and keeps it current. Declaring
+# `@netlify/plugin-nextjs` here would opt the site OUT of those automatic updates, and
+# because that package is not in package.json Netlify resolves it itself ΓÇö where the old
+# v4.x line breaks against Next 16 ("outdated version of the Next.js Runtime").
+# See https://docs.netlify.com/frameworks/next-js/overview/
+
+[[headers]]
+  # Hashed build assets are immutable; the HTML that references them is not.
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# REQUIRED build variable ΓÇö set this in Netlify under
+# Site configuration > Environment variables > "Production build environment".
+#
+#   NEXT_PUBLIC_API_BASE_URL=https://your-api.onrender.com
+#
+# It must be the backend's BARE ORIGIN: scheme and host only, with NO trailing "/api".
+# The backend mounts its routers under two different prefixes ("/tenders/..." and
+# "/api/v1/tenders/...") and the frontend appends both verbatim, so only the bare origin
+# resolves both families correctly. The "/api" suffix is a Docker-Compose convention where
+# nginx strips it; pointing straight at the deployed API must not include it.
+#
+# NEXT_PUBLIC_* values are inlined into the browser bundle by `next build`, so changing one
+# requires a NEW BUILD - republishing an existing deploy will not pick it up.

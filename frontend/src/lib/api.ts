@@ -8,15 +8,66 @@ import { clearTokens, getAccessToken, refreshAccessToken } from "./auth-store";
  * genuinely finished and pretending otherwise would loop.
  */
 
-const configuredApiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
-if (!configuredApiBase) {
-  throw new Error(
-    "NEXT_PUBLIC_API_BASE_URL is required. Set it before running next dev or next build.",
-  );
+/*
+ * API base URL resolution.
+ *
+ * NEXT_PUBLIC_* values are inlined into the browser bundle by `next build`, so this is
+ * frozen into whatever artifact was built (see the Next.js env-var docs). The build must
+ * therefore never *depend* on the variable being set. It used to: this module threw at
+ * evaluation time when it was missing, and because `api.ts` is imported by `telemetry.ts`
+ * -> `States.tsx` -> `RequireAuth.tsx` -> the page modules, that single throw surfaced as
+ * "Error occurred prerendering page /_not-found" and failed the entire build. One forgotten
+ * CI build variable became an undeployable commit with an error that pointed nowhere near
+ * the actual cause.
+ *
+ * Resolution order:
+ *   1. NEXT_PUBLIC_API_BASE_URL - authoritative. Set in every real deployment (Docker
+ *      Compose, native dev, Netlify), so existing behaviour is unchanged.
+ *   2. A localStorage override, consulted ONLY when step 1 found nothing. This is the escape
+ *      hatch for a URL that was unknown or wrong at build time: an already-deployed site can
+ *      be pointed at the real API from the browser with no rebuild. Because it is only read
+ *      when the env var is absent, it can never shadow a correctly configured deployment.
+ *   3. "" - same-origin, for hosting the API behind a reverse proxy on the same host.
+ *
+ * A missing value is then reported as an ordinary request error (see requireApiBase) so a
+ * misconfigured site renders and explains itself instead of crashing the build.
+ */
+
+/** localStorage key for the build-time-override escape hatch. See step 2 above. */
+export const RUNTIME_API_BASE_KEY = "ti.apiBase";
+
+function readRuntimeOverride(): string | null {
+  // Server-side prerender has no window and no storage; the env var covers that path.
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(RUNTIME_API_BASE_KEY)?.trim() || null;
+  } catch {
+    // Storage disabled (private mode, blocked cookies). Fall through to same-origin.
+    return null;
+  }
 }
 
+const buildTimeApiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || null;
+
 // Trim a trailing slash so every request below has exactly one path separator.
-export const API_BASE = configuredApiBase.replace(/\/+$/, "");
+export const API_BASE = (buildTimeApiBase ?? readRuntimeOverride() ?? "").replace(/\/+$/, "");
+
+/**
+ * Refuse to issue a request when no API base was resolved.
+ *
+ * Throwing here (rather than at module load) keeps `next build` green and produces an error
+ * the user can act on. The same-origin fallback is allowed, so this only fires when there is
+ * genuinely nothing to call.
+ */
+function requireApiBase(): string {
+  if (API_BASE) return API_BASE;
+  throw new ApiError(
+    0,
+    "The API address is not configured. Set NEXT_PUBLIC_API_BASE_URL in your build " +
+      `environment and redeploy, or set localStorage.${RUNTIME_API_BASE_KEY} to the API ` +
+      "origin (for example https://your-api.onrender.com) to fix this without rebuilding.",
+  );
+}
 
 export class ApiError extends Error {
   constructor(
@@ -92,7 +143,7 @@ async function send(path: string, opts: RequestOptions, token: string | null): P
     body = JSON.stringify(opts.body);
   }
 
-  return fetch(`${API_BASE}${path}`, {
+  return fetch(`${requireApiBase()}${path}`, {
     method: opts.method ?? "GET",
     headers,
     body,
