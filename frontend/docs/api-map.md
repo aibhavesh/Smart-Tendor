@@ -526,6 +526,13 @@ and capped, and `truncated: true` means there are more.
 | GET | `/system-health` | ADMIN | — | `SystemHealthResponse` |
 | GET | `/api-usage` | ADMIN | — | `ApiUsageResponse` |
 
+⚠️ **There is also a CLI.** `backend/scripts/manage.py` exposes every operation
+above — `bootstrap`, `list-users`, `set-role`, `pre-provision`,
+`revoke-pre-provision`, `deactivate` — for an operator with no browser session. It
+calls the same services these endpoints do, so the guards and audit entries are
+identical. `bootstrap` is the only one without a required `--actor`, since it
+creates the first administrator; it refuses once any SUPER_ADMIN exists.
+
 ⚠️ **How a role is assigned, and the two endpoints people confuse.**
 
 Every new account is born `EMPLOYEE`, automatically, on both the register and the

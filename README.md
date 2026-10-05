@@ -218,6 +218,52 @@ role an account is **born** with, for somebody who has not signed in yet. It is
 read exactly once, at creation, and never again — so promoting someone who already
 has an account through it would silently do nothing.
 
+### Bootstrapping and administering roles without the UI
+
+Every role operation is also available from the command line, from `backend/`,
+with no SQL and no browser session. Each subcommand calls the same application
+service the HTTP endpoint calls, so the domain rules and the audit trail are
+identical.
+
+```bash
+# Once, on an empty database. Refuses if a SUPER_ADMIN already exists.
+python scripts/manage.py bootstrap --email founder@example.com --password "..."
+
+python scripts/manage.py list-users
+python scripts/manage.py set-role someone@example.com --role MANAGER --actor you@example.com
+python scripts/manage.py pre-provision new@example.com --role ADMIN --actor you@example.com
+python scripts/manage.py deactivate someone@example.com --actor you@example.com --yes
+```
+
+`bootstrap` is the only subcommand that runs without a named `--actor`, because it
+*creates* the first administrator and so has nobody to name. It writes an audit
+entry with a null actor, mirroring the bootstrap migration, and refuses as soon as
+any SUPER_ADMIN exists — so it can never mint a second one.
+
+Every other subcommand requires `--actor`, resolved to a real account, and inherits
+the same guards as the UI: an actor cannot assign a role above their own level,
+cannot modify an account more privileged than their own, and cannot edit
+themselves. `deactivate` additionally requires `--yes` and revokes every active
+session belonging to the account.
+
+Exit codes: `0` success, `1` refused by a domain rule, `2` bad usage.
+
+⚠️ **On a new database, do not skip `BOOTSTRAP_SUPER_ADMIN_EMAIL`.** Migration
+`d4a1e9c5b872` reads it once and is never re-applied, and it cannot be undone by
+downgrading because `f0e1d2c3b4a5` makes its downgrade raise. A database created
+without it has no SUPER_ADMIN — and since only a SUPER_ADMIN can grant that role,
+`bootstrap` would then refuse as well, leaving nobody able to administer it. Set it
+in `backend/.env`, or run `bootstrap` instead.
+
+⚠️ **Break-glass recovery.** If the only SUPER_ADMIN account is lost, neither the
+UI nor this tool can mint a replacement: `bootstrap` refuses, and everyone else is
+below the ceiling. Recovery is one direct statement, and should be treated as the
+exception it is:
+
+```sql
+UPDATE users SET role = 'SUPER_ADMIN' WHERE email = 'someone@example.com';
+```
+
 There is exactly one gate shape in the application: inclusive. The previous
 non-inheriting gate existed to keep bid verdicts away from ADMIN and was removed
 with the verdict endpoint.

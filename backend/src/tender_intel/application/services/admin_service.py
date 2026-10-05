@@ -39,6 +39,28 @@ from tender_intel.domain.value_objects.pagination import Page, PageRequest
 
 
 class AdminService:
+    #: Read-only access to the underlying repositories, for operator tooling.
+    #:
+    #: Exposed as properties rather than by having callers reach into ``_users``
+    #: and friends. The operator CLI has to *find* an account before it can act on
+    #: it, and doing that through the service keeps every mutation inside a method
+    #: that enforces the authority rules. Nothing here bypasses them.
+    @property
+    def users(self) -> UserRepository:
+        return self._users
+
+    @property
+    def sessions(self) -> UserSessionRepository:
+        return self._sessions
+
+    @property
+    def assignments(self) -> RoleAssignmentRepository:
+        return self._assignments
+
+    @property
+    def audits(self) -> AuditLogRepository:
+        return self._audits
+
     def __init__(
         self,
         *,

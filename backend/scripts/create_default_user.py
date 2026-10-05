@@ -19,6 +19,10 @@ role assignment already grants that email), same as any other sign-up.
 
 Safe to re-run: if the email already has an account, the script says so and
 exits without changing anything (register() itself rejects the duplicate).
+
+To create the *first administrator* rather than a floor-role account, use
+``scripts/manage.py bootstrap`` instead — it grants SUPER_ADMIN and refuses to
+run twice.
 """
 
 from __future__ import annotations
@@ -27,20 +31,10 @@ import argparse
 import asyncio
 import sys
 
-from tender_intel.application.services.auth_service import AuthService
 from tender_intel.core.config import get_settings
 from tender_intel.domain.exceptions import DuplicateEntityError, ForbiddenDomainError
 from tender_intel.infrastructure.db.session import create_engine, create_session_factory
-from tender_intel.infrastructure.repositories.audit_repo import SqlAlchemyAuditLogRepository
-from tender_intel.infrastructure.repositories.role_assignment_repo import (
-    SqlAlchemyRoleAssignmentRepository,
-)
-from tender_intel.infrastructure.repositories.user_repo import (
-    SqlAlchemyUserRepository,
-    SqlAlchemyUserSessionRepository,
-)
-from tender_intel.infrastructure.security.google import GoogleTokenVerifierImpl
-from tender_intel.infrastructure.security.tokens import TokenService
+from tender_intel.infrastructure.operator import build_operator_services
 
 DEFAULT_EMAIL = "testuser@maheshwaricomputers.com"
 DEFAULT_PASSWORD = "TestUser@123"
@@ -53,17 +47,11 @@ async def _create(email: str, password: str, full_name: str) -> None:
     factory = create_session_factory(engine)
 
     async with factory() as session:
-        auth_service = AuthService(
-            users=SqlAlchemyUserRepository(session),
-            sessions=SqlAlchemyUserSessionRepository(session),
-            assignments=SqlAlchemyRoleAssignmentRepository(session),
-            audits=SqlAlchemyAuditLogRepository(session),
-            tokens=TokenService(settings),
-            google=GoogleTokenVerifierImpl(settings.google_client_id),
-            settings=settings,
-        )
+        # Shared with scripts/manage.py, so this script cannot drift from the
+        # services the API itself is built from.
+        services = build_operator_services(session, settings)
         try:
-            await auth_service.register(
+            await services.auth.register(
                 email=email,
                 password=password,
                 full_name=full_name,

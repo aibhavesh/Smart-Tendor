@@ -551,6 +551,28 @@ now does it, and hides rather than disables what the server would refuse (your o
 row, or anyone above your own role), so the screen never implies an action that
 would fail with 403.
 
+**There is a third route: `backend/scripts/manage.py`.** For an operator without a
+browser session, every role operation is available from the command line. Each
+subcommand takes the services built by
+`infrastructure/operator.build_operator_services` — the same composition the API
+uses — and calls the same service methods, so the guards and audit entries are
+identical rather than reimplemented. `scripts/create_default_user.py` shares that
+same builder, so the two scripts cannot drift from the API.
+
+```
+bootstrap  list-users  set-role  pre-provision  revoke-pre-provision  deactivate
+```
+
+`bootstrap` is the only one without a required `--actor`: it creates the *first*
+administrator, so there is nobody to name. It records a null actor, the same
+convention as migration `d4a1e9c5b872`, and refuses the moment any SUPER_ADMIN
+exists. `test_bootstrap_refuses_when_a_super_admin_exists` pins that, and
+`test_an_admin_cannot_grant_super_admin` /
+`test_an_admin_cannot_modify_a_super_admin` pin the inherited guards. The handlers
+take injected services rather than opening their own connection, which is what makes
+them testable against the suite's `StaticPool` in-memory SQLite — going through
+`main()` would build a second engine and reach a different database.
+
 ⚠️ Promoting an existing account through `/admin/role-assignments` **silently does
 nothing** — the list is consulted once, at creation, and skips addresses that
 already have an account. That is deliberate, not a bug.
