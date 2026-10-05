@@ -9,7 +9,6 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from tender_intel.application.dto.analytics import BOQAnalytics
 from tender_intel.domain.entities import BOQItem, TenderMetadata
 from tender_intel.domain.entities.metadata import METADATA_FIELDS
 from tender_intel.domain.value_objects.extracted_field import ExtractedField
@@ -82,39 +81,6 @@ class BOQItemResponse(BaseModel):
             amount=_maybe(item.amount),
             category=item.category,
             confidence=item.confidence,
-        )
-
-
-class BOQCategoryResponse(BaseModel):
-    category: str
-    item_count: int
-    total_quantity: str
-    total_value: str
-    value_share: float
-
-
-class BOQAnalyticsResponse(BaseModel):
-    total_items: int
-    items_with_amount: int
-    total_value: str
-    categories: list[BOQCategoryResponse]
-
-    @classmethod
-    def from_dto(cls, analytics: BOQAnalytics) -> BOQAnalyticsResponse:
-        return cls(
-            total_items=analytics.total_items,
-            items_with_amount=analytics.items_with_amount,
-            total_value=str(analytics.total_value),
-            categories=[
-                BOQCategoryResponse(
-                    category=c.category,
-                    item_count=c.item_count,
-                    total_quantity=str(c.total_quantity),
-                    total_value=str(c.total_value),
-                    value_share=c.value_share,
-                )
-                for c in analytics.categories
-            ],
         )
 
 

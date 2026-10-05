@@ -175,6 +175,7 @@ async def test_extract_api_flow(client, app_db):
     meta = await client.get(f"/tenders/{tender['id']}/metadata", headers=headers)
     assert meta.status_code == 200
 
-    analytics = await client.get(f"/tenders/{tender['id']}/boq/analytics", headers=headers)
-    assert analytics.status_code == 200
-    assert analytics.json()["total_items"] == 0  # no tables in a text upload
+    # A text upload has no tables, so the BOQ list is empty rather than absent.
+    boq = await client.get(f"/tenders/{tender['id']}/boq", headers=headers)
+    assert boq.status_code == 200
+    assert boq.json() == []

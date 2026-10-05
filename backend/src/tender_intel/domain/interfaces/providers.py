@@ -1,8 +1,8 @@
 """Provider ports — external capabilities the domain depends on abstractly.
 
-Concrete adapters live in ``infrastructure`` (Qdrant, bge embeddings, Gemini,
-httpx downloader, local file storage). The domain and application layers know
-only these Protocols.
+Concrete adapters live in ``infrastructure`` (Qdrant, bge embeddings, httpx
+downloader, local file storage). The domain and application layers know only
+these Protocols.
 """
 
 from __future__ import annotations
@@ -35,15 +35,6 @@ class FileStorage(Protocol):
     async def read(self, relative_path: str) -> bytes: ...
 
     async def delete(self, relative_path: str) -> None: ...
-
-
-@runtime_checkable
-class EmailSender(Protocol):
-    """Delivers one message. The domain never learns how."""
-
-    async def send(
-        self, *, to: list[str], subject: str, text_body: str, html_body: str | None = None
-    ) -> None: ...
 
 
 @runtime_checkable
@@ -94,15 +85,6 @@ class VectorStore(Protocol):
     async def delete(self, collection: str, id: UUID) -> None: ...
 
     async def health(self) -> bool: ...
-
-
-@runtime_checkable
-class LLMProvider(Protocol):
-    async def generate_json(
-        self, *, system: str, prompt: str, schema: dict[str, Any]
-    ) -> dict[str, Any]:
-        """Return schema-valid JSON, or raise on malformed/unavailable output."""
-        ...
 
 
 @dataclass(frozen=True, slots=True)

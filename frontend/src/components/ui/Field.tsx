@@ -28,7 +28,9 @@ function FieldShell({
   children,
 }: {
   id: string;
-  label: string;
+  /** A node, so a control in a repeating row can supply a visually hidden label
+   *  and keep its accessible name without adding visible text to every line. */
+  label: ReactNode;
   helper?: string;
   error?: string;
   required?: boolean;
@@ -58,7 +60,7 @@ function FieldShell({
   );
 }
 
-type Common = { label: string; helper?: string; error?: string };
+type Common = { label: ReactNode; helper?: string; error?: string };
 
 export function TextField({
   label,

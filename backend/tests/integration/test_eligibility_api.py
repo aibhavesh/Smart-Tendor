@@ -151,25 +151,27 @@ async def test_indeterminate_when_turnover_is_missing(client, app_db):
     assert any("completed financial years" in r for r in body["reasons"])
 
 
-async def test_empty_turnover_routes_to_review_not_refusal(client, app_db):
-    """The invariant rule 1b exists to protect.
+async def test_empty_turnover_is_indeterminate_not_a_refusal(client, app_db):
+    """With nothing configured, an unscreened tender must reach a person.
 
-    With nothing configured, every tender must reach a person. Grouping
-    indeterminate under NOT_ELIGIBLE instead would return NO_BID for the whole
-    portfolio until an administrator has entered three years of figures.
+    INDETERMINATE is the whole point of the third status: collapsing it into
+    NOT_ELIGIBLE would rule out the entire portfolio until an administrator has
+    entered three completed years of turnover. The result must stay undecided and
+    must say why, so a manager knows what to supply.
     """
     headers = await _admin(client, app_db)
     tender_id = await _parsed_tender(client, headers)
 
     screened = await client.post(f"{BASE}/tenders/{tender_id}/eligibility", headers=headers)
-    assert screened.json()["status"] == "INDETERMINATE"
+    assert screened.status_code == 200
+    body = screened.json()
 
-    analyzed = await client.post(f"/tenders/{tender_id}/analyze", headers=headers)
-    assert analyzed.status_code == 200
-    body = analyzed.json()
-    assert body["recommendation"]["verdict"] == "REVIEW"
-    assert body["qualification"]["status"] == "INDETERMINATE"
-    assert body["recommendation"]["win_probability"] > 0
+    assert body["status"] == "INDETERMINATE"
+    # Not merely the right label: the financial rule stayed undecided and said why.
+    assert body["financial_pass"] is None
+    assert any("completed financial years" in reason for reason in body["reasons"])
+    # And it is explicitly not a rejection.
+    assert body["status"] != "NOT_ELIGIBLE"
 
 
 # --------------------------------------------------------------------------- #

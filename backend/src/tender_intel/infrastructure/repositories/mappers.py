@@ -21,7 +21,6 @@ from tender_intel.domain.entities import (
     Tender,
     TenderDocument,
     TenderMetadata,
-    TenderReview,
     User,
     UserSession,
 )
@@ -40,7 +39,6 @@ from tender_intel.domain.enums.eligibility import (
     MatchMethod,
     SimilarWorkRule,
 )
-from tender_intel.domain.enums.review import ReviewKind, ReviewVerdict
 from tender_intel.domain.enums.roles import UserRole
 from tender_intel.domain.enums.tender_status import TenderStatus
 from tender_intel.domain.enums.work_type import (
@@ -63,7 +61,6 @@ from tender_intel.infrastructure.db.orm import (
     TenderEligibilityWorkTypeModel,
     TenderMetadataModel,
     TenderModel,
-    TenderReviewModel,
     UserModel,
     UserSessionModel,
     WorkTypeAliasModel,
@@ -391,34 +388,9 @@ def past_project_to_model(e: PastProject) -> PastProjectModel:
     return m
 
 
-def review_to_domain(m: TenderReviewModel) -> TenderReview:
-    return TenderReview(
-        id=m.id,
-        tender_id=m.tender_id,
-        reviewer_id=m.reviewer_id,
-        kind=ReviewKind(m.kind),
-        verdict=ReviewVerdict(m.verdict) if m.verdict else None,
-        comments=m.comments,
-        before_snapshot=dict(m.before_snapshot),
-        after_snapshot=dict(m.after_snapshot),
-        created_at=m.created_at,
-    )
-
-
-def review_to_model(e: TenderReview) -> TenderReviewModel:
-    return TenderReviewModel(
-        id=e.id,
-        tender_id=e.tender_id,
-        reviewer_id=e.reviewer_id,
-        kind=e.kind.value,
-        verdict=e.verdict.value if e.verdict is not None else None,
-        comments=e.comments,
-        before_snapshot=e.before_snapshot,
-        after_snapshot=e.after_snapshot,
-        created_at=e.created_at,
-    )
-
-
+# --------------------------------------------------------------------------- #
+# Audit trail
+# --------------------------------------------------------------------------- #
 def audit_to_domain(m: AuditLogModel) -> AuditLog:
     return AuditLog(
         id=m.id,

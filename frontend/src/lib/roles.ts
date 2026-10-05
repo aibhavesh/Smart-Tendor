@@ -27,9 +27,9 @@ export const ROLE_LABEL: Record<Role, string> = {
 
 /** What each role may actually do — shown alongside the code, never instead of it. */
 export const ROLE_DESCRIPTION: Record<Role, string> = {
-  EMPLOYEE: "Adds tenders, runs analysis, and corrects extracted fields",
-  MANAGER: "Approves or rejects tenders — owns the final bid decision",
-  ADMIN: "Manages users, audit logs, and system health",
+  EMPLOYEE: "Adds tenders, uploads documents, and screens tenders for eligibility",
+  MANAGER: "Everything an employee does, plus records certified turnover",
+  ADMIN: "Manages users, pre-provisioned roles, work types and the audit trail",
   SUPER_ADMIN: "Full platform control, including deleting users",
 };
 
@@ -37,20 +37,4 @@ export const ROLE_DESCRIPTION: Record<Role, string> = {
 export function canActAs(role: Role | null | undefined, required: Role): boolean {
   if (!role) return false;
   return ROLE_LEVEL[role] >= ROLE_LEVEL[required];
-}
-
-/**
- * True only for these exact roles — mirrors `require_exact_roles`.
- *
- * The bid verdict is the one capability the hierarchy must not hand upward: ADMIN
- * outranks MANAGER on level but owns user administration, not bid decisions.
- */
-export function isExactly(role: Role | null | undefined, ...allowed: Role[]): boolean {
-  if (!role) return false;
-  return allowed.includes(role);
-}
-
-/** Who may record an APPROVE / REJECT verdict. */
-export function canDecideVerdict(role: Role | null | undefined): boolean {
-  return isExactly(role, "MANAGER", "SUPER_ADMIN");
 }

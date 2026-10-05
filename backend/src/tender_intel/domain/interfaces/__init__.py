@@ -3,7 +3,6 @@ from tender_intel.domain.interfaces.providers import (
     DownloadResult,
     EmbeddingProvider,
     FileStorage,
-    LLMProvider,
     VectorMatch,
     VectorStore,
 )
@@ -14,7 +13,6 @@ from tender_intel.domain.interfaces.repositories import (
     TenderDocumentRepository,
     TenderMetadataRepository,
     TenderRepository,
-    TenderReviewRepository,
     UserRepository,
     UserSessionRepository,
 )
@@ -26,12 +24,10 @@ __all__ = [
     "Downloader",
     "EmbeddingProvider",
     "FileStorage",
-    "LLMProvider",
     "PastProjectRepository",
     "TenderDocumentRepository",
     "TenderMetadataRepository",
     "TenderRepository",
-    "TenderReviewRepository",
     "UserRepository",
     "UserSessionRepository",
     "VectorMatch",

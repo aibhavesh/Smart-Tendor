@@ -19,6 +19,7 @@ from tender_intel.api.routers import (
     eligibility,
     extraction,
     health,
+    observability,
     project_import,
     projects,
     retirement,
@@ -95,6 +96,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.container = container
 
+    # Registered after CORS so it wraps it: Starlette applies middleware in
+    # reverse order of registration, so the observability layer sits outermost
+    # and observes the response CORS actually produced — including the status
+    # code of a rejected preflight, which is exactly what an operator wants to
+    # see when diagnosing a CORS fault.
+    app.add_middleware(ObservabilityMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_allow_origins,
@@ -118,6 +125,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(eligibility.router)
     app.include_router(work_types.router)
     app.include_router(company_turnover.router)
+    app.include_router(observability.router)
 
     _instrument_tracing(app, settings)
     return app

@@ -86,11 +86,11 @@ class AuditLogResponse(BaseModel):
 class PlatformStatsResponse(BaseModel):
     tenders_total: int
     tenders_by_status: dict[str, int]
+    eligibility_by_status: dict[str, int]
     users_total: int
     users_active: int
     users_by_role: dict[str, int]
     past_projects_total: int
-    reviews_total: int
     documents_total: int
 
     @classmethod

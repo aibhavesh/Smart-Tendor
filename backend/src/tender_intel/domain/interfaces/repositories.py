@@ -7,7 +7,7 @@ All list operations are paginated and return a :class:`Page`.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
@@ -20,23 +20,19 @@ from tender_intel.domain.entities import (
     Tender,
     TenderDocument,
     TenderMetadata,
-    TenderReview,
     User,
     UserSession,
 )
 from tender_intel.domain.entities.company_turnover import CompanyTurnover
-from tender_intel.domain.entities.eligibility import (
-    EligibilityNotification,
-    TenderEligibility,
-)
+from tender_intel.domain.entities.eligibility import TenderEligibility
 from tender_intel.domain.entities.work_type import (
     PastProjectWorkType,
     WorkType,
     WorkTypeAlias,
 )
 from tender_intel.domain.enums.document_status import DocumentStatus
-from tender_intel.domain.enums.roles import UserRole
 from tender_intel.domain.enums.eligibility import EligibilityStatus
+from tender_intel.domain.enums.roles import UserRole
 from tender_intel.domain.enums.tender_status import TenderStatus
 from tender_intel.domain.value_objects.pagination import Page, PageRequest
 
@@ -120,18 +116,6 @@ class PastProjectRepository(Protocol):
     async def list_unindexed(self, limit: int) -> Sequence[PastProject]: ...
     async def update(self, project: PastProject) -> PastProject: ...
     async def delete(self, project_id: UUID) -> None: ...
-
-
-class EligibilityNotificationRepository(Protocol):
-    async def add(self, entry: EligibilityNotification) -> EligibilityNotification: ...
-    async def was_notified(self, tender_id: UUID, fingerprint: str) -> bool: ...
-
-
-class TenderReviewRepository(Protocol):
-    async def add(self, review: TenderReview) -> TenderReview: ...
-    async def get(self, review_id: UUID) -> TenderReview | None: ...
-    async def list_for_tender(self, tender_id: UUID) -> list[TenderReview]: ...
-    async def latest_verdict_at(self, tender_id: UUID) -> datetime | None: ...
 
 
 class AuditLogRepository(Protocol):

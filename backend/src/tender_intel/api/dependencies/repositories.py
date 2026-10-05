@@ -6,6 +6,7 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tender_intel.api.dependencies.db import get_session
+from tender_intel.infrastructure.repositories.audit_repo import SqlAlchemyAuditLogRepository
 from tender_intel.infrastructure.repositories.eligibility_repo import (
     SqlAlchemyCompanyTurnoverRepository,
     SqlAlchemyPortfolioVersionRepository,
@@ -77,15 +78,8 @@ def get_user_session_repo(
     return SqlAlchemyUserSessionRepository(session)
 
 
-class NoOpAuditLogRepository:
-    """Compatibility sink while retained services shed the retired audit flow."""
-
-    async def add(self, entry: object) -> None:
-        del entry
-
-
-def get_audit_repo() -> NoOpAuditLogRepository:
-    return NoOpAuditLogRepository()
+def get_audit_repo(session: AsyncSession = Depends(get_session)) -> SqlAlchemyAuditLogRepository:
+    return SqlAlchemyAuditLogRepository(session)
 
 
 def get_work_type_repo(

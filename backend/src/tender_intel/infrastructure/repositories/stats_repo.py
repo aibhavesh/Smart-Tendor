@@ -34,7 +34,7 @@ class SqlAlchemyStatsRepository:
             users_active=users_active,
             users_by_role=users_by_role,
             past_projects_total=await self._count(PastProjectModel),
-            reviews_total=0,
+            eligibility_by_status=await self._group_count(TenderEligibilityModel.status),
             documents_total=await self._count(TenderDocumentModel),
         )
 
@@ -47,8 +47,19 @@ class SqlAlchemyStatsRepository:
             tenders_by_status=tenders_by_status,
             eligibility_by_status=eligibility_by_status,
             past_projects_total=await self._count(PastProjectModel),
-            reviews_pending=0,
+            screening_pending=await self._screening_pending(),
         )
+
+    async def _screening_pending(self) -> int:
+        """Tenders with no recorded screen, plus those whose result is stale.
+
+        Staleness cannot be computed in SQL — it is a digest recomputed in Python
+        from the live portfolio — so this deliberately counts only the unscreened.
+        A stale result still carries a row, and ``EligibilityService.is_stale``
+        reports that case per tender when it matters.
+        """
+        screened = await self._count(TenderEligibilityModel)
+        return max(0, sum((await self._group_count(TenderModel.status)).values()) - screened)
 
     async def _count(self, model: Any, *conditions: Any) -> int:
         stmt = select(func.count()).select_from(model)

@@ -32,8 +32,9 @@ async def test_employee_can_read_operational_stats(client, app_db):
     assert set(body) == {
         "tenders_total",
         "tenders_by_status",
+        "eligibility_by_status",
         "past_projects_total",
-        "reviews_pending",
+        "screening_pending",
     }
     # No user or account figures leak through this surface.
     assert "users_total" not in body
@@ -57,8 +58,9 @@ async def test_counts_track_registered_tenders(client, app_db):
     assert after["tenders_by_status"]["REGISTERED"] == (
         before["tenders_by_status"].get("REGISTERED", 0) + 2
     )
-    # Newly registered tenders are not analysed, so the review queue is unchanged.
-    assert after["reviews_pending"] == before["reviews_pending"]
+    # A newly registered tender has never been screened, so the screening backlog
+    # grows by exactly the two that were added.
+    assert after["screening_pending"] == before["screening_pending"] + 2
 
 
 async def test_totals_agree_with_the_paginated_list(client, app_db):
@@ -77,12 +79,15 @@ async def test_totals_agree_with_the_paginated_list(client, app_db):
     assert registered.json()["total"] == stats["tenders_by_status"].get("REGISTERED", 0)
 
 
-async def test_reviews_pending_matches_the_queue(client, app_db):
-    """reviews_pending and GET /reviews/pending share one definition."""
+async def test_screening_pending_is_tenders_minus_screens(client, app_db):
+    """screening_pending is the unscreened remainder, not a stored counter."""
     manager = await auth_headers(client, app_db, email="manager@x.com", role=UserRole.MANAGER)
 
-    stats = (await client.get("/stats", headers=manager)).json()
-    queue = await client.get("/reviews/pending", params={"limit": 1}, headers=manager)
+    before = (await client.get("/stats", headers=manager)).json()
+    await _register_tender(client, manager, "NIT/2026/9004")
+    after = (await client.get("/stats", headers=manager)).json()
 
-    assert queue.status_code == 200
-    assert queue.json()["total"] == stats["reviews_pending"]
+    assert after["tenders_total"] == before["tenders_total"] + 1
+    assert after["screening_pending"] == after["tenders_total"] - sum(
+        after["eligibility_by_status"].values()
+    )

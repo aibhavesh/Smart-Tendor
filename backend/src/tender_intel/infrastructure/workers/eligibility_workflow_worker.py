@@ -25,6 +25,7 @@ from tender_intel.infrastructure.extraction.pdf_backends import (
 )
 from tender_intel.infrastructure.extraction.rule_metadata import RuleBasedMetadataExtractor
 from tender_intel.infrastructure.observability.logging import get_logger
+from tender_intel.infrastructure.repositories.audit_repo import SqlAlchemyAuditLogRepository
 from tender_intel.infrastructure.repositories.eligibility_repo import (
     SqlAlchemyCompanyTurnoverRepository,
     SqlAlchemyPortfolioVersionRepository,
@@ -41,11 +42,6 @@ from tender_intel.infrastructure.repositories.work_type_repo import SqlAlchemyWo
 from tender_intel.infrastructure.storage import LocalFileStorage
 
 _log = get_logger(__name__)
-
-
-class _NoOpAuditLogRepository:
-    async def add(self, entry: object) -> None:
-        del entry
 
 
 class EligibilityWorkflowWorker:
@@ -110,7 +106,7 @@ class EligibilityWorkflowWorker:
         async with self._session_factory() as session:
             tenders = SqlAlchemyTenderRepository(session)
             metadata = SqlAlchemyTenderMetadataRepository(session)
-            audits = _NoOpAuditLogRepository()
+            audits = SqlAlchemyAuditLogRepository(session)
             extraction = ExtractionService(
                 tenders=tenders,
                 documents=SqlAlchemyTenderDocumentRepository(session),

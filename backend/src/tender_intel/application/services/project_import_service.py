@@ -102,9 +102,7 @@ class ProjectImportService:
         candidates = await self._candidates() if auto_tag else []
 
         for filename, content in files:
-            result.files.append(
-                await self._import_one(filename, content, candidates, actor_id)
-            )
+            result.files.append(await self._import_one(filename, content, candidates, actor_id))
 
         await self._audit_batch(result, actor_id, actor_role, ip, user_agent, auto_tag)
         return result

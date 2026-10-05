@@ -4,10 +4,10 @@
 ``require_role`` builds a dependency enforcing the four-level hierarchy on a
 protected endpoint.
 
-``require_exact_roles`` is the escape hatch for the rare capability that must
-*not* be inherited upward — the bid verdict belongs to MANAGER and SUPER_ADMIN,
-and an ADMIN sitting at level 40 must not acquire it just by outranking a
-manager.
+Every gate in this application is inclusive: a capability required at level *N* is
+available to every role at or above it. There is deliberately no non-inheriting
+gate, because nothing in the eligibility workflow needs one — screening is
+EMPLOYEE-level work, and the administrative surfaces are simply gated at ADMIN.
 """
 
 from __future__ import annotations
@@ -83,18 +83,6 @@ def require_role(minimum: UserRole) -> Callable[..., Awaitable[User]]:
     async def dependency(user: User = Depends(get_current_user)) -> User:
         if not user.can_act_as(minimum):
             raise PermissionDeniedError(f"requires {minimum.value} (have {user.role.value})")
-        return user
-
-    return dependency
-
-
-def require_exact_roles(*allowed: UserRole) -> Callable[..., Awaitable[User]]:
-    """Admit only the listed roles — no inheritance from higher levels."""
-
-    async def dependency(user: User = Depends(get_current_user)) -> User:
-        if not user.is_exactly(*allowed):
-            names = " or ".join(r.value for r in allowed)
-            raise PermissionDeniedError(f"requires {names} exactly (have {user.role.value})")
         return user
 
     return dependency

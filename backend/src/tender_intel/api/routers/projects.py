@@ -51,9 +51,7 @@ async def delete_all_projects(
     user: User = Depends(require_role(UserRole.MANAGER)),
 ) -> PastProjectBulkDeleteResponse:
     """Permanently remove the entire past-project registry."""
-    return PastProjectBulkDeleteResponse(
-        deleted=await service.delete_all(actor_id=user.id)
-    )
+    return PastProjectBulkDeleteResponse(deleted=await service.delete_all(actor_id=user.id))
 
 
 @router.get("/{project_id}", response_model=PastProjectResponse)

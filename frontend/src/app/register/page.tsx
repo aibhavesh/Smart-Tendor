@@ -56,6 +56,7 @@ function RegisterBody() {
       setError(
         describeError(err, {
           403: "That email address is not on the organisation's domain. Use your work email instead.",
+          404: "The account service could not be reached. Please try again shortly.",
           409: "An account with this email already exists. Try logging in instead.",
         }),
       );

@@ -1,4 +1,4 @@
-"""AuditLog — immutable record of every state-changing action.
+"""AuditLog ΓÇö immutable record of every state-changing action.
 
 Written with a before/after diff on every significant action (cross-cutting
 requirement). Never updated or deleted once created.

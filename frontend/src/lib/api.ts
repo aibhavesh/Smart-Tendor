@@ -47,10 +47,40 @@ function readRuntimeOverride(): string | null {
   }
 }
 
-const buildTimeApiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || null;
+const rawBuildTimeApiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || null;
 
-// Trim a trailing slash so every request below has exactly one path separator.
-export const API_BASE = (buildTimeApiBase ?? readRuntimeOverride() ?? "").replace(/\/+$/, "");
+function normaliseApiBase(value: string | null): string | null {
+  // Trim a trailing slash so every request below has exactly one path separator.
+  const base = (value ?? "").replace(/\/+$/, "");
+  if (!base) return null;
+
+  try {
+    const url = new URL(base);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    const isLocalDockerGateway =
+      url.protocol === "http:" &&
+      url.hostname === "localhost" &&
+      url.port === "8080" &&
+      url.pathname === "/api";
+
+    // Docker Compose routes browser requests through Nginx at /api and strips that
+    // prefix before forwarding to FastAPI. Railway exposes FastAPI directly, where
+    // /api/auth/register does not exist. Tolerate a copied Docker suffix for a
+    // deployed API without changing the intentionally proxied local configuration.
+    if (!isLocalDockerGateway && url.pathname === "/api") return url.origin;
+  } catch {
+    // A literal variable name would otherwise become a same-origin browser request.
+    return null;
+  }
+
+  return base;
+}
+
+const buildTimeApiBase = normaliseApiBase(rawBuildTimeApiBase);
+const runtimeApiBase = normaliseApiBase(readRuntimeOverride());
+const hasInvalidBuildTimeApiBase = Boolean(rawBuildTimeApiBase && !buildTimeApiBase);
+
+export const API_BASE = buildTimeApiBase ?? runtimeApiBase ?? "";
 
 /**
  * Refuse to issue a request when no API base was resolved.
@@ -61,6 +91,12 @@ export const API_BASE = (buildTimeApiBase ?? readRuntimeOverride() ?? "").replac
  */
 function requireApiBase(): string {
   if (API_BASE) return API_BASE;
+  if (hasInvalidBuildTimeApiBase) {
+    throw new ApiError(
+      0,
+      "The deployed API address is invalid. Set NEXT_PUBLIC_API_BASE_URL in Netlify to the full Railway API origin, then trigger a new build.",
+    );
+  }
   throw new ApiError(
     0,
     "The API address is not configured. Set NEXT_PUBLIC_API_BASE_URL in your build " +

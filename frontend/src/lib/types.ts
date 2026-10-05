@@ -416,19 +416,24 @@ export interface OperationalStats {
   tenders_by_status: Record<string, number>;
   eligibility_by_status: Record<string, number>;
   past_projects_total: number;
-  /** Analysed but not yet reviewed — the same definition as GET /reviews/pending. */
-  reviews_pending: number;
+  /**
+   * Recorded but never screened. This is the "a human still owes this a
+   * decision" backlog: it is what drives the dashboard call to action, and it is
+   * derived, so it cannot drift from the underlying tender count.
+   */
+  screening_pending: number;
 }
 
 /** GET /admin/stats — ADMIN+ only; adds user and account figures. */
 export interface PlatformStats {
   tenders_total: number;
   tenders_by_status: Record<string, number>;
+  /** Screened tenders by verdict — ELIGIBLE / NOT_ELIGIBLE / INDETERMINATE. */
+  eligibility_by_status: Record<string, number>;
   users_total: number;
   users_active: number;
   users_by_role: Record<string, number>;
   past_projects_total: number;
-  reviews_total: number;
   documents_total: number;
 }
 

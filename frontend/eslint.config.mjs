@@ -39,7 +39,24 @@ const eslintConfig = defineConfig([
       "no-restricted-syntax": ["error", ...themeRules],
     },
   },
-  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
+  /*
+   * Build output and vendored trees are not source.
+   *
+   * `.netlify/` in particular holds a full compiled copy of the app plus the
+   * Netlify server handler. Without this, `npm run lint` lints generated
+   * JavaScript and fails on hundreds of errors that no edit to this repository
+   * can fix — a locally-run script created that folder. ESLint does not read
+   * .gitignore, so the exclusions have to be repeated here.
+   */
+  globalIgnores([
+    ".next/**",
+    "out/**",
+    "build/**",
+    ".netlify/**",
+    "node_modules/**",
+    "venv/**",
+    "next-env.d.ts",
+  ]),
 ]);
 
 export default eslintConfig;

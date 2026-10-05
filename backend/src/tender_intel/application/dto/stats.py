@@ -18,7 +18,8 @@ class OperationalStats:
     tenders_by_status: dict[str, int]
     eligibility_by_status: dict[str, int]
     past_projects_total: int
-    #: Tenders analysed but not yet reviewed — the same definition the pending
-    #: review queue uses (``ReviewService.pending``), kept in one place so the
-    #: dashboard count and the queue can never disagree.
-    reviews_pending: int
+    #: Tenders recorded but never screened, plus those whose recorded result is
+    #: stale against its inputs. This is the real "a human still owes this a
+    #: decision" backlog now that the platform screens eligibility rather than
+    #: collecting review verdicts.
+    screening_pending: int

@@ -39,14 +39,6 @@ class User:
     def can_act_as(self, required: UserRole) -> bool:
         return self.is_active and self.role.can_act_as(required)
 
-    def is_exactly(self, *roles: UserRole) -> bool:
-        """True when this active user holds one of ``roles`` exactly.
-
-        Used where a capability must *not* be inherited by higher tiers — the
-        bid verdict, which belongs to MANAGER and SUPER_ADMIN but not ADMIN.
-        """
-        return self.is_active and self.role in roles
-
 
 @dataclass(slots=True)
 class UserSession:

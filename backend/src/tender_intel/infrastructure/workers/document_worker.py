@@ -15,17 +15,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from tender_intel.application.services.document_service import DocumentService
 from tender_intel.domain.interfaces.providers import Downloader, FileStorage
 from tender_intel.infrastructure.observability.logging import get_logger
+from tender_intel.infrastructure.repositories.audit_repo import SqlAlchemyAuditLogRepository
 from tender_intel.infrastructure.repositories.tender_repo import (
     SqlAlchemyTenderDocumentRepository,
     SqlAlchemyTenderRepository,
 )
 
 _log = get_logger(__name__)
-
-
-class _NoOpAuditLogRepository:
-    async def add(self, entry: object) -> None:
-        del entry
 
 
 class DocumentDownloadWorker:
@@ -49,7 +45,7 @@ class DocumentDownloadWorker:
             service = DocumentService(
                 tenders=SqlAlchemyTenderRepository(session),
                 documents=SqlAlchemyTenderDocumentRepository(session),
-                audits=_NoOpAuditLogRepository(),
+                audits=SqlAlchemyAuditLogRepository(session),
                 downloader=self._downloader,
                 storage=self._storage,
             )

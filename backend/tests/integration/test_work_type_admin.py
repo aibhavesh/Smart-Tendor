@@ -233,9 +233,7 @@ async def test_turnover_requires_manager_or_higher(client, app_db):
     employee = await _employee(client, app_db)
     assert (await client.get(f"{BASE}/company-turnover", headers=employee)).status_code == 403
 
-    manager = await auth_headers(
-        client, app_db, email="manager@example.com", role=UserRole.MANAGER
-    )
+    manager = await auth_headers(client, app_db, email="manager@example.com", role=UserRole.MANAGER)
     created = await client.post(
         f"{BASE}/company-turnover",
         json={"financial_year": "2024-25", "contractual_turnover": "1000000"},
@@ -245,9 +243,7 @@ async def test_turnover_requires_manager_or_higher(client, app_db):
 
 
 async def test_manager_can_extract_turnover_from_excel(client, app_db):
-    manager = await auth_headers(
-        client, app_db, email="manager@example.com", role=UserRole.MANAGER
-    )
+    manager = await auth_headers(client, app_db, email="manager@example.com", role=UserRole.MANAGER)
     workbook = Workbook()
     sheet = workbook.active
     sheet.append(["Financial Year", "Certified Turnover"])
@@ -283,9 +279,7 @@ async def test_manager_can_extract_turnover_from_excel(client, app_db):
 
 
 async def test_manager_can_extract_turnover_from_horizontal_excel_table(client, app_db):
-    manager = await auth_headers(
-        client, app_db, email="manager@example.com", role=UserRole.MANAGER
-    )
+    manager = await auth_headers(client, app_db, email="manager@example.com", role=UserRole.MANAGER)
     workbook = Workbook()
     sheet = workbook.active
     sheet.append(["Year", "2022-23", "2023-24", "2024-25"])

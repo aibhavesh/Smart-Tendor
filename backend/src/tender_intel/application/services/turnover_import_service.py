@@ -5,10 +5,10 @@ from __future__ import annotations
 import asyncio
 import io
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from pathlib import PurePath
-from typing import Iterable
 
 from openpyxl import load_workbook
 
@@ -18,10 +18,16 @@ from tender_intel.infrastructure.extraction.pdf_backends import OcrPdfTextExtrac
 
 _YEAR_RE = re.compile(
     r"(?<!\d)(?:f(?:inancial)?\.?\s*y(?:ear)?\.?\s*[:\-]? *)?"
-    r"(20\d{2})\s*(?:-|/|to)\s*['’]?(\d{2}|20\d{2})(?!\d)",
+    # The curly apostrophe alternative is deliberate: spreadsheets commonly write
+    # a financial year as 2023-24 with that character rather than a straight quote,
+    # and matching only the straight one silently misses those labels.
+    r"(20\d{2})\s*(?:-|/|to)\s*['’]?(\d{2}|20\d{2})(?!\d)",  # noqa: RUF001
     re.IGNORECASE,
 )
-_NUMBER_RE = re.compile(r"(?:₹|rs\.?|inr)?\s*\d[\d,]*(?:\.\d+)?\s*(?:cr(?:ore)?s?|la(?:kh|c)s?)?", re.IGNORECASE)
+_NUMBER_RE = re.compile(
+    r"(?:₹|rs\.?|inr)?\s*\d[\d,]*(?:\.\d+)?\s*(?:cr(?:ore)?s?|la(?:kh|c)s?)?",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,7 +77,9 @@ def _amount(value: object) -> Decimal | None:
 
 def _header_kind(value: object) -> str | None:
     text = re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
-    if text in {"fy", "f y", "year", "financial year", "assessment year"} or "financial year" in text:
+    if text in {"fy", "f y", "year", "financial year", "assessment year"} or (
+        "financial year" in text
+    ):
         return "year"
     if "turnover" in text or "annual receipts" in text:
         return "amount"

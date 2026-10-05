@@ -116,28 +116,31 @@ async def test_require_role_enforces_hierarchy():
         await admin_only(user=employee)
 
 
-async def test_require_exact_roles_does_not_inherit_upward():
-    from tender_intel.api.dependencies.auth import require_exact_roles
+async def test_require_role_admits_every_level_above_it():
+    """The only gate shape in this application: inclusive, upward.
 
-    verdict = require_exact_roles(UserRole.MANAGER, UserRole.SUPER_ADMIN)
+    ``require_exact_roles`` was removed along with the bid-verdict endpoint. This
+    pins the remaining gate's behaviour so a future capability that genuinely must
+    not inherit upward is added deliberately, with its own test, rather than by
+    widening this one.
+    """
+    from tender_intel.api.dependencies.auth import require_role
+
+    manager_only = require_role(UserRole.MANAGER)
     manager = User(email="m@b.com", full_name="M", role=UserRole.MANAGER)
-    root = User(email="s@b.com", full_name="S", role=UserRole.SUPER_ADMIN)
     admin = User(email="a@b.com", full_name="A", role=UserRole.ADMIN)
+    root = User(email="s@b.com", full_name="S", role=UserRole.SUPER_ADMIN)
     employee = User(email="e@b.com", full_name="E", role=UserRole.EMPLOYEE)
 
-    assert await verdict(user=manager) is manager
-    assert await verdict(user=root) is root
-    # ADMIN outranks MANAGER on level and is still refused — that is the point.
-    for denied in (admin, employee):
-        with pytest.raises(PermissionDeniedError):
-            await verdict(user=denied)
+    for admitted in (manager, admin, root):
+        assert await manager_only(user=admitted) is admitted
+    with pytest.raises(PermissionDeniedError):
+        await manager_only(user=employee)
 
 
-async def test_inactive_user_fails_both_gates():
-    from tender_intel.api.dependencies.auth import require_exact_roles, require_role
+async def test_inactive_user_fails_the_gate():
+    from tender_intel.api.dependencies.auth import require_role
 
     dormant = User(email="x@b.com", full_name="X", role=UserRole.SUPER_ADMIN, is_active=False)
     with pytest.raises(PermissionDeniedError):
         await require_role(UserRole.EMPLOYEE)(user=dormant)
-    with pytest.raises(PermissionDeniedError):
-        await require_exact_roles(UserRole.SUPER_ADMIN)(user=dormant)

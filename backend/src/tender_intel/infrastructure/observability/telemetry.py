@@ -32,6 +32,13 @@ http_request_duration_seconds = Histogram(
 )
 
 
+def generate_latest() -> bytes:
+    """Render the registry in Prometheus exposition format."""
+    from prometheus_client import generate_latest as _generate
+
+    return _generate(REGISTRY)
+
+
 def collect_request_samples() -> list[tuple[dict[str, str], float]]:
     """Return (labels, value) for every http_requests_total counter sample."""
     samples: list[tuple[dict[str, str], float]] = []

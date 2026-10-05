@@ -28,7 +28,6 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
-    UniqueConstraint,
     Uuid,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -162,34 +161,21 @@ class BOQItemModel(Base):
     confidence: Mapped[float] = mapped_column(default=0.0)
 
 
-# Retained only to let old migration revisions import; the workflow-reduction
-# migration drops this table and the running application never registers a writer.
-class TenderReviewModel(Base):
-    __tablename__ = "tender_reviews"
-
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    tender_id: Mapped[UUID] = mapped_column(ForeignKey("tenders.id", ondelete="CASCADE"))
-    reviewer_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
-    kind: Mapped[str] = mapped_column(String(16))
-    verdict: Mapped[str | None] = mapped_column(String(32))
-    comments: Mapped[str | None] = mapped_column(Text)
-    before_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
-    after_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(UTCDateTime)
-
-
 class AuditLogModel(Base):
+    """Append-only. ``actor_id`` is a bare UUID with no foreign key so that
+    deleting a user never cascades away the trail of what they did."""
+
     __tablename__ = "audit_logs"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     action: Mapped[str] = mapped_column(String(128))
     entity_type: Mapped[str] = mapped_column(String(64))
     entity_id: Mapped[str | None] = mapped_column(String(128))
-    actor_id: Mapped[UUID | None] = mapped_column(Uuid)
+    actor_id: Mapped[UUID | None] = mapped_column(Uuid, index=True)
     diff: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     ip_address: Mapped[str | None] = mapped_column(String(64))
     user_agent: Mapped[str | None] = mapped_column(String(512))
-    created_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, index=True)
 
 
 class PastProjectModel(TimestampMixin, Base):
@@ -286,17 +272,6 @@ class CompanyTurnoverModel(Base):
         ForeignKey("users.id", ondelete="SET NULL"), index=True
     )
     recorded_at: Mapped[datetime] = mapped_column(UTCDateTime)
-
-
-class EligibilityNotificationModel(Base):
-    __tablename__ = "eligibility_notifications"
-
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    tender_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("tenders.id", ondelete="CASCADE"))
-    inputs_fingerprint: Mapped[str] = mapped_column(String(64))
-    status: Mapped[str] = mapped_column(String(32))
-    recipients: Mapped[list[str]] = mapped_column(JSON, default=list)
-    sent_at: Mapped[datetime] = mapped_column(UTCDateTime)
 
 
 class TenderEligibilityModel(Base):

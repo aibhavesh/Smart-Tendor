@@ -28,6 +28,7 @@ _BACKEND = Path(__file__).resolve().parents[2]
 _INITIAL = "df21fab595ca"  # base schema, before the role collapse
 _COLLAPSE_ROLES = "a1c4e07b91d2"
 _BEFORE_BOOTSTRAP = "c2d8b6f4173a"  # role_assignments exists, nothing seeded
+_BOOTSTRAP_REVISION = "d4a1e9c5b872"  # the seeding revision itself
 _BEFORE_SPLIT = "d4a1e9c5b872"  # tender_reviews still requires a verdict
 _SPLIT = "e7c3a5d18f92"  # hashed_password still absent
 _RESTORE_PASSWORD = "7690fc277a01"
@@ -114,12 +115,18 @@ def test_untouched_roles_survive_the_collapse(engine: sa.Engine):
 
 
 def test_downgrade_of_the_collapse_lands_on_the_lower_role(engine: sa.Engine):
-    """The split is unrecoverable; the downgrade under-grants rather than over-grants."""
+    """The split is unrecoverable; the downgrade under-grants rather than over-grants.
+
+    Driven between the two revisions that bracket the collapse rather than from
+    ``head``: ``f0e1d2c3b4a5`` deliberately makes its own downgrade raise, so a
+    downgrade to the base revision from head is not a supported operation. The
+    data migration under test is the same either way.
+    """
     _upgrade(engine, _INITIAL)
     with engine.begin() as connection:
         _insert_user(connection, "analyst@x.com", "ANALYST")
-    _upgrade(engine, "head")
 
+    _upgrade(engine, _COLLAPSE_ROLES)
     _downgrade(engine, _INITIAL)
 
     assert _role_of(engine, "analyst@x.com") == "VIEWER"
@@ -219,6 +226,12 @@ def _insert_legacy_review(
     return review_id
 
 
+#: Last revision at which ``tender_reviews`` still exists. ``f0e1d2c3b4a5`` drops
+#: the table, so the split migration can only be exercised up to here — not at
+#: ``head``, where the table the assertions read does not exist.
+_REVIEWS_LAST_EXISTS = _RESTORE_PASSWORD
+
+
 def test_existing_reviews_backfill_as_verdict(engine: sa.Engine):
     """Exact, not a guess: the only writer required a verdict."""
     _upgrade(engine, _BEFORE_SPLIT)
@@ -228,7 +241,7 @@ def test_existing_reviews_backfill_as_verdict(engine: sa.Engine):
         _insert_legacy_review(connection, tender, reviewer, "APPROVED")
         _insert_legacy_review(connection, tender, reviewer, "REJECTED")
 
-    _upgrade(engine, "head")
+    _upgrade(engine, _REVIEWS_LAST_EXISTS)
 
     with engine.connect() as connection:
         rows = connection.execute(
@@ -238,7 +251,7 @@ def test_existing_reviews_backfill_as_verdict(engine: sa.Engine):
 
 
 def test_verdict_becomes_nullable_and_kind_is_indexed(engine: sa.Engine):
-    _upgrade(engine, "head")
+    _upgrade(engine, _REVIEWS_LAST_EXISTS)
 
     inspector = sa.inspect(engine)
     columns = {c["name"]: c for c in inspector.get_columns("tender_reviews")}
@@ -250,7 +263,7 @@ def test_verdict_becomes_nullable_and_kind_is_indexed(engine: sa.Engine):
 
 def test_downgrade_deletes_corrections_and_restores_not_null(engine: sa.Engine):
     """Documented data loss: the old schema cannot represent a correction."""
-    _upgrade(engine, "head")
+    _upgrade(engine, _REVIEWS_LAST_EXISTS)
     with engine.begin() as connection:
         reviewer = _insert_user(connection, "m@x.com", "MANAGER", with_password=False)
         tender = _insert_tender(connection, "T-1")
@@ -279,6 +292,16 @@ def test_downgrade_deletes_corrections_and_restores_not_null(engine: sa.Engine):
     assert [r[0] for r in rows] == ["APPROVED"]  # the correction is gone
     assert "kind" not in columns
     assert columns["verdict"]["nullable"] is False
+
+
+def test_the_review_table_is_gone_at_head(engine: sa.Engine):
+    """The correction/verdict split is real history, not the current schema.
+
+    Pins the reduction so a future reader is not misled by the migrations above
+    into thinking ``tender_reviews`` is still part of the product.
+    """
+    _upgrade(engine, "head")
+    assert "tender_reviews" not in sa.inspect(engine).get_table_names()
 
 
 # --- Bootstrap --- #
@@ -316,11 +339,22 @@ def test_bootstrap_seeds_a_super_admin_assignment(engine: sa.Engine, bootstrap_e
 
 
 def test_bootstrap_is_idempotent(engine: sa.Engine, bootstrap_email: str):
-    _upgrade(engine, "head")
-    # Re-running the final revision must not add a second row.
+    """Re-running the seeding revision must not add a second row.
+
+    Driven by stepping back to the revision before it and forward again, rather
+    than downgrading from ``head`` — the reduction revision in between makes its
+    own downgrade raise, so the rollback path under test is not available from
+    head. The seed revision itself is unchanged either way.
+    """
+    _upgrade(engine, _BOOTSTRAP_REVISION)  # seeded once
+    assert _assignments(engine, bootstrap_email) == [(bootstrap_email, "SUPER_ADMIN")]
+
+    # Step back and forward: the seed runs a second time against a table that
+    # already holds the row it would write.
     _downgrade(engine, _BEFORE_BOOTSTRAP)
     _upgrade(engine, "head")
     _upgrade(engine, "head")
+
     assert _assignments(engine, bootstrap_email) == [(bootstrap_email, "SUPER_ADMIN")]
 
 

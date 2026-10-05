@@ -7,6 +7,7 @@ import {
   FolderKanban,
   LayoutDashboard,
   BadgeIndianRupee,
+  ScrollText,
   Settings,
   Upload,
   UserPlus,
@@ -20,10 +21,9 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 /*
  * The application shell — role-aware navigation against the four-level hierarchy.
  *
- * `minRole` is set from what the API actually permits, never from a plan table. Note
- * that /reviews is EMPLOYEE+: the pending queue is readable by anyone, because seeing
- * what awaits a decision is not the same as making one. The decision form on that
- * screen is gated separately, and its absence is explained rather than silent.
+ * `minRole` is set from what the API actually permits, never from a plan table. The
+ * admin links are ADMIN because the API gates user management, role pre-provisioning
+ * and the audit trail at that level.
  *
  * Hiding a link is presentation only. The server still enforces the real check.
  */
@@ -43,6 +43,7 @@ const NAV: NavItem[] = [
   { href: "/turnover", label: "Certified turnover", icon: BadgeIndianRupee, minRole: "MANAGER" },
   { href: "/admin", label: "Administration", icon: Settings, minRole: "ADMIN" },
   { href: "/admin/role-assignments", label: "Pre-provisioned roles", icon: UserPlus, minRole: "ADMIN" },
+  { href: "/admin/audit-logs", label: "Audit trail", icon: ScrollText, minRole: "ADMIN" },
 ];
 
 function matches(pathname: string, href: string) {

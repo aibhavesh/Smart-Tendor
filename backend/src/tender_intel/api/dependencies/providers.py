@@ -9,7 +9,6 @@ from tender_intel.core.config import Settings
 from tender_intel.domain.interfaces.providers import (
     DocumentTextExtractor,
     EmbeddingProvider,
-    LLMProvider,
     VectorStore,
 )
 from tender_intel.infrastructure.downloader import HttpxDownloader
@@ -49,9 +48,3 @@ def get_embedding_provider(request: Request) -> EmbeddingProvider:
 
 def get_vector_store(request: Request) -> VectorStore:
     return get_container(request).vector_store()
-
-
-def get_llm_provider(settings: Settings = Depends(get_app_settings)) -> LLMProvider:
-    from tender_intel.infrastructure.llm.factory import resolve_llm_provider
-
-    return resolve_llm_provider(settings)

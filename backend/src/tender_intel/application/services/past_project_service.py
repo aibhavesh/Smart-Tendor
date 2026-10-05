@@ -7,6 +7,7 @@ not indexed (e.g. created while the vector store was unavailable).
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from uuid import UUID
 
 from tender_intel.application.dto.past_project import PastProjectCreate, PastProjectPatch
@@ -106,16 +107,27 @@ class PastProjectService:
             _log.warning("past_project.vector_delete_failed", error=str(exc))
         await self._audit(actor_id, "past_project.delete", project_id)
 
-    async def delete_many(self, project_ids: list[UUID], *, actor_id: UUID | None = None) -> int:
+    async def delete_many(
+        self, project_ids: Sequence[UUID], *, actor_id: UUID | None = None
+    ) -> int:
         """Delete an explicitly selected set only when every ID still exists.
 
         Checking the complete selection before the first delete avoids a half-applied
         bulk operation when another user has already removed one of the projects.
+
+        ``Sequence`` rather than ``list`` in the signature: the ``list`` method
+        declared earlier on this class shadows the builtin for every annotation
+        that follows it in the class body, exactly as it does in
+        ``WorkTypeRepository``. De-duplication therefore builds a dict and calls
+        ``list()`` at runtime, where the shadowing does not apply.
         """
         unique_ids = list(dict.fromkeys(project_ids))
         projects = list(await self._projects.get_many(unique_ids))
         found_ids = {project.id for project in projects}
-        missing = next((project_id for project_id in unique_ids if project_id not in found_ids), None)
+        missing = next(
+            (project_id for project_id in unique_ids if project_id not in found_ids),
+            None,
+        )
         if missing is not None:
             raise EntityNotFoundError("PastProject", missing)
 
@@ -139,7 +151,9 @@ class PastProjectService:
             batch = await self._projects.list(PageRequest(limit=MAX_LIMIT, offset=0))
             if not batch.items:
                 return deleted
-            deleted += await self.delete_many([project.id for project in batch.items], actor_id=actor_id)
+            deleted += await self.delete_many(
+                [project.id for project in batch.items], actor_id=actor_id
+            )
 
     async def backfill(self, batch_size: int = 50) -> int:
         pending = await self._projects.list_unindexed(batch_size)

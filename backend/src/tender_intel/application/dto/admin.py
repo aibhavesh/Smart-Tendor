@@ -13,7 +13,9 @@ class PlatformStats:
     users_active: int
     users_by_role: dict[str, int]
     past_projects_total: int
-    reviews_total: int
+    #: Screened tenders, by recorded verdict. Mirrors the eligibility breakdown in
+    #: ``OperationalStats``; kept here so the admin board is one round trip.
+    eligibility_by_status: dict[str, int]
     documents_total: int
 
 

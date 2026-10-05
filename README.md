@@ -1,22 +1,23 @@
-# Tender Intelligence Platform
+# Tender Eligibility Screening Platform
 
-Decision support for **bid / no-bid analysis of construction tenders**, built for
-Maheshwari Computer.
+Decision support for **bid / no-bid eligibility screening of construction
+tenders**, built for Maheshwari Computer.
 
-The platform ingests a tender, extracts its commercial and eligibility terms,
-scores it against the company's capacity and its own past projects, and returns a
-**GO / REVIEW / NO_BID** recommendation with the reasoning attached. A manager
-signs off. Every state change is written to an audit log.
+The platform ingests a tender, extracts its commercial and eligibility terms, and
+screens it against the company's declared financial capacity and its own past
+projects. It answers one question — *can we bid this?* — as
+`ELIGIBLE` / `NOT_ELIGIBLE` / `INDETERMINATE`, with the reasoning attached. A
+manager acts on the result. Every state change is written to an audit log.
 
-The scoring is deterministic. The AI analyst explains a decision; it never
-changes one.
+The scoring is deterministic. All arithmetic is exact `Decimal`.
 
 ---
 
 ## Contents
 
+- [What this platform does](#what-this-platform-does)
 - [Quick start](#quick-start)
-- [How it works](#how-it-works) — lifecycle, decision engines, review, access control
+- [How it works](#how-it-works)
 - [Architecture](#architecture)
 - [API](#api)
 - [Configuration](#configuration)
@@ -24,7 +25,26 @@ changes one.
 - [Frontend verification](#frontend-verification)
 - [Deployment](#deployment)
 - [Security](#security)
-- [Asset licensing](#asset-licensing)
+
+---
+
+## What this platform does
+
+**It screens tenders for eligibility. It does not produce a bid recommendation,
+and it does not collect review verdicts.**
+
+That distinction is load-bearing, so it is worth being explicit about what changed
+and why. This system was originally built as a GO / REVIEW / NO_BID
+recommendation platform with a risk engine, a win-probability model, an AI analyst
+narrative, and a human sign-off queue. Migration `f0e1d2c3b4a5` ("reduce to
+eligibility workflow") removed that surface: the review queue, the audit-readable
+verdicts, the notification ledger, and the risk/recommendation engines all went
+with it. The current product screens eligibility only.
+
+If you are looking for a bid recommendation, a win probability, or a risk score,
+none of those exist in this repository. If you are looking for "should we bid this
+at all, given what we have actually done and what we actually earn", that is
+exactly what this does.
 
 ---
 
@@ -33,11 +53,12 @@ changes one.
 One command from a fresh clone. It writes the environment files, collects the
 administrator email, optionally configures Google and Gemini, generates service
 secrets, builds every service, and starts the stack. Backend startup applies the
-migrations, including the first-administrator role assignment.
+migrations.
 
 ```powershell
 ./scripts/setup.ps1        # Windows
 ```
+
 ```bash
 ./scripts/setup.sh         # macOS / Linux / Git Bash
 ```
@@ -50,7 +71,7 @@ You are asked for the administrator email and may optionally configure integrati
 | --- | --- |
 | **Administrator email** | Seeded as the first `SUPER_ADMIN` role assignment. Register that address with email/password or use Google; the account is born `SUPER_ADMIN`. |
 | **Google OAuth client ID** | Optional. Enables Google Identity Services alongside email/password. See [frontend/docs/google-sign-in.md](frontend/docs/google-sign-in.md). |
-| **Gemini API key** | Optional. Enables generated analyst narratives; deterministic scoring works without it. |
+| **Gemini API key** | Optional. Not currently used by any live code path; see [Known limitations](#known-limitations). |
 
 Re-running `setup` is safe: a value you have already set is never overwritten.
 
@@ -65,23 +86,15 @@ Postgres and Qdrant stay in Docker; the API and the web app run on your host.
 ./scripts/setup.ps1 -Mode native    # once
 ./scripts/dev.ps1                   # API :8000 + web :3000
 ```
-```bash
-./scripts/setup.sh --mode native
-./scripts/dev.sh
-```
 
 `setup` points `DATABASE_URL` and `QDRANT_URL` at the Compose service names in
 docker mode and at `localhost` in native mode, so one `backend/.env` serves both.
-Switching modes means re-running `setup` with the other mode.
 
 ### Unattended
 
 ```bash
-TI_ADMIN_EMAIL=ops@example.com \
-  ./scripts/setup.sh --non-interactive
+TI_ADMIN_EMAIL=ops@example.com ./scripts/setup.sh --non-interactive
 ```
-
-`--skip-start` (`-SkipStart`) writes the configuration without touching Docker.
 
 ---
 
@@ -89,11 +102,10 @@ TI_ADMIN_EMAIL=ops@example.com \
 
 ### Tender lifecycle
 
-Nothing is analysed before it is parsed, and no recommendation exists before the
-engines have run. The lifecycle enforces that ordering.
+Nothing is screened before it is parsed. The lifecycle enforces that ordering.
 
 ```
-REGISTERED → DOWNLOADED → PARSED → ANALYZED → REVIEWED
+REGISTERED → DOWNLOADED → PARSED → ARCHIVED
 ```
 
 | State | Meaning |
@@ -101,72 +113,79 @@ REGISTERED → DOWNLOADED → PARSED → ANALYZED → REVIEWED
 | `REGISTERED` | Tender recorded; source documents not yet fetched. |
 | `DOWNLOADED` | Documents retrieved and stored. |
 | `PARSED` | Text and fields extracted from those documents. |
-| `ANALYZED` | Risk, qualification and recommendation engines have run. |
-| `REVIEWED` | A manager has recorded a verdict. |
 | `ARCHIVED` | Closed. Terminal — nothing transitions out of it. |
 
-Any state may move to `ARCHIVED`. A `REVIEWED` tender may return to `ANALYZED`,
-which is what makes re-analysis after a correction possible.
+Transitions as implemented in `domain/enums/tender_status.py`:
+
+| From | Allowed targets |
+| --- | --- |
+| `REGISTERED` | `DOWNLOADED`, `ARCHIVED` |
+| `DOWNLOADED` | `PARSED`, `ARCHIVED` |
+| `PARSED` | `ANALYZED`, `ARCHIVED` |
+| `ANALYZED` | `REVIEWED`, `PARSED`, `ARCHIVED` |
+| `REVIEWED` | `ANALYZED`, `ARCHIVED` |
+| `ARCHIVED` | none |
+
+`ANALYZED` and `REVIEWED` are still legal states and the edges between them are
+still defined, but **no code path reaches them**. The live workflow ends at
+`PARSED` plus a separate eligibility annotation, and `ARCHIVED` is reached by
+exactly one route: the ADMIN-only tender retirement endpoint. `ANALYZED` and
+`REVIEWED` are retained so an existing database's rows remain readable, and are
+filterable on `GET /tenders`.
 
 Documents carry their own status, independent of the tender:
 `PENDING` → `DOWNLOADING` → `DOWNLOADED`, or `FAILED`.
 
-### The decision engines
+### The screening engine
 
-Three deterministic engines, all in `backend/src/tender_intel/domain/decision/`.
-They read every constant from `thresholds.py` and never inline a numeric literal,
-so the thresholds can later become administrator-managed configuration without
-hunting values through the code. All arithmetic is exact `Decimal`.
+`domain/decision/eligibility.py`. It reads every constant from `thresholds.py` and
+never inlines a numeric literal, so the thresholds can later become
+administrator-managed configuration without hunting values through the code. All
+arithmetic is exact `Decimal`.
 
-**Risk** — six categories, each scored `NONE` / `LOW` / `MEDIUM` / `HIGH` and
-mapped onto a 0–10 scale:
+Three rules, evaluated together:
 
-| Category | What it flags |
+| Rule | Test |
 | --- | --- |
-| `PERFORMANCE_GUARANTEE` | Guarantee demanded as a percentage of tender value. |
-| `LIQUIDATED_DAMAGES` | Penalty exposure for delay. |
-| `OEM_DEPENDENCY` | Reliance on a single original manufacturer. |
-| `SHORT_COMPLETION_TIME` | Delivery window too tight for the value. |
-| `HIGH_EMD` | Earnest money deposit disproportionate to tender value. |
-| `SPECIAL_CLAUSES` | Non-standard terms needing a human read. |
+| **Financial capacity** | The tender's required capital is `min(V/N, V)` where `V` is tender value and `N` is the required number of years. It is compared against the **average certified turnover over the last 3 completed financial years**. |
+| **Stage A — work type** | The tender's scope of work is matched against the company's work-type taxonomy: `EXACT` → `LEXICAL` → `SEMANTIC`, first hit wins. |
+| **Stage B — similar work** | Past projects completed within the last **7 years**, carrying a matching work type and a value of at least **60%** (one project), **40%** (two), or **30%** (three) of the tender value. |
 
-A keyword detected but with an unparseable magnitude falls back to `MEDIUM` —
-fail toward caution, not toward dismissal. High EMD is the single documented
-exception, where an unparseable clause is `LOW`.
+The result is a three-valued status:
 
-**Qualification** — three eligibility rules checked against the company's declared
-capacity: past work value, average annual turnover (against a required percentage
-of tender value), and net worth. A figure the company has not declared fails the
-rule rather than passing it silently.
-
-**Recommendation** — ordered rules, first match wins:
-
-| Rule | Outcome |
+| Status | Meaning |
 | --- | --- |
-| Qualification failed | `NO_BID` |
-| Overall risk score > 8.0 | `REVIEW` |
-| Strong past-project match | `GO` |
-| Mid match | `REVIEW` |
-| Weak match | `NO_BID` |
-| Qualified, risk acceptable, no eligibility rules | `GO` |
+| `ELIGIBLE` | Every rule passed. |
+| `NOT_ELIGIBLE` | At least one rule **definitively** failed. |
+| `INDETERMINATE` | No rule definitively failed, but at least one could not be decided. |
 
-Alongside the verdict the engine returns a **win probability** (clamped 10–95, or
-0 for `NO_BID`), a **confidence** score that decays with every missing extracted
-field, and explicit pros, cons and a checklist.
+**`INDETERMINATE` is the important one.** A missing input never resolves into a
+pass, and it never collapses into a failure. If turnover has not been entered for
+three completed years, or the tender value could not be parsed, or the scope of
+work matched no work type, the tender reaches a person. Grouping indeterminate
+under "not eligible" would rule out the entire portfolio until an administrator
+finished configuring it.
+
+Alongside the status the engine returns a before/after explanation: which rules
+failed and in what words, which work types matched and by which method, and which
+past projects qualified and in what order.
+
+### Staleness
+
+A screening result records a fingerprint of the inputs it was computed from —
+the tender metadata, the turnover window, the work-type candidates, and a counter
+that every portfolio mutation bumps. Staleness is **derived by recomputing that
+digest**, never stored as a flag, so no code path has to remember to clear it.
+
+`GET /tenders/{id}/eligibility` reports `is_stale` on every read. It is a warning
+only: nothing is recomputed, invalidated or hidden, and the recorded result stays
+readable until it is replaced by a fresh screening.
 
 ### Human review
 
-A review record is explicitly one of two kinds, never inferred:
-
-- **`CORRECTION`** — someone fixed an extracted field. No decision was made and
-  the tender does not move.
-- **`VERDICT`** — a manager decided (`APPROVED` / `REJECTED`). This is the bid
-  decision.
-
-Keeping the distinction explicit means review history and audit diffs never have
-to guess what a row meant, and a correction can never be misread as a decision.
-A verdict recorded before a later correction is marked stale rather than silently
-trusted.
+There is no review queue and no verdict workflow. A screening result is read and
+acted on outside the system. What *is* recorded, on every state change, is the
+audit trail.
 
 ### Access control
 
@@ -175,20 +194,39 @@ every role at or above it.
 
 | Role | Level | Scope |
 | --- | --- | --- |
-| `EMPLOYEE` | 20 | The floor every account is born with. Read tenders, run analysis, record corrections. |
-| `MANAGER` | 30 | Everything above, plus recording bid verdicts. |
-| `ADMIN` | 40 | Everything above, plus user management and audit logs. |
-| `SUPER_ADMIN` | 50 | Full control, including role assignment. |
+| `EMPLOYEE` | 20 | The floor every account is born with. Read tenders, upload documents, run extraction, screen for eligibility, manage past projects. |
+| `MANAGER` | 30 | Everything above, plus recording and amending certified turnover. |
+| `ADMIN` | 40 | Everything above, plus user and role management, the work-type taxonomy, tender retirement, and the audit trail. |
+| `SUPER_ADMIN` | 50 | Full control, including deleting users. |
 
 `EMPLOYEE` is the floor, not a rejection. The gaps between levels are deliberate —
 do not renumber them.
+
+**Every new account is born `EMPLOYEE`, automatically, with no configuration.**
+That is not a default you can forget to set — it is what the code does on every
+registration and every Google first sign-in. Self-registration is open to anyone
+who can receive mail at an allowed domain, so nothing about signing up grants
+anything, and this is pinned by tests that fail if the floor is ever lifted.
+
+**Changing someone's role is done in the application**, on `/admin` under *User
+management*. It applies immediately and is written to the audit trail with its
+actor and a before/after diff. You do not need a database script or a migration to
+promote a colleague.
+
+The `/admin/role-assignments` screen is a different, narrower tool: it decides the
+role an account is **born** with, for somebody who has not signed in yet. It is
+read exactly once, at creation, and never again — so promoting someone who already
+has an account through it would silently do nothing.
+
+There is exactly one gate shape in the application: inclusive. The previous
+non-inheriting gate existed to keep bid verdicts away from ADMIN and was removed
+with the verdict endpoint.
 
 **Sign-in supports email/password and optional Google Identity Services.** There
 is no password-reset flow. Passwords are PBKDF2-hashed and never stored in plain
 text. Admission is fail-closed: the address must sit on a domain in
 `ALLOWED_EMAIL_DOMAINS`, or be named individually in `ALLOWED_EMAIL_EXCEPTIONS`.
-An empty domain list rejects everyone. New accounts land at `EMPLOYEE` unless an
-administrator pre-provisioned a higher role for that address first.
+An empty domain list rejects everyone.
 
 ---
 
@@ -198,9 +236,9 @@ Clean Architecture. Dependencies point inward; the domain depends on nothing.
 
 ```
 backend/src/tender_intel/
-  domain/          entities, enums, decision engines, exceptions, interfaces
+  domain/          entities, enums, the screening engine, exceptions, interfaces
   application/     use-case services orchestrating the domain
-  infrastructure/  SQLAlchemy repos, vector store, extraction, LLM, observability
+  infrastructure/  SQLAlchemy repos, vector store, extraction, observability
   api/             FastAPI routers, schemas, dependencies
   core/            env-sourced settings + DI container
 frontend/src/
@@ -211,9 +249,9 @@ scripts/           setup + dev launchers (PowerShell and Bash)
 docker/nginx/      reverse proxy config
 ```
 
-**Guiding principles** — domain-first; a deterministic core with constrained AI;
-and *fail toward caution*: `UNKNOWN` over a guess, `MEDIUM` over dismissal,
-offline fallback over failure, an audit entry on every state change.
+**Guiding principles** — domain-first; a deterministic core; and *fail toward
+caution*: `UNKNOWN` over a guess, `INDETERMINATE` over a refusal, offline
+fallback over failure, an audit entry on every state change.
 
 ### Stack
 
@@ -224,7 +262,6 @@ offline fallback over failure, an audit entry on every state change.
 | Data | PostgreSQL 16 · Qdrant (vector search) |
 | Embeddings | fastembed · `BAAI/bge-small-en-v1.5` (384-d), with a deterministic offline backend |
 | Extraction | pdfplumber / PyMuPDF · openpyxl for spreadsheet import |
-| AI analyst | Google Gemini — optional, degrades gracefully when absent |
 | Observability | structlog · Prometheus · OpenTelemetry · Sentry |
 | Edge | nginx on `:8080` → web on `:3000`, `/api/` → API on `:8000` |
 
@@ -244,11 +281,11 @@ offline fallback over failure, an audit entry on every state change.
 | --- | --- |
 | `/` | Landing page. |
 | `/login`, `/register` | Email/password access with optional Google sign-in. |
-| `/dashboard` | Portfolio overview and pending work. |
-| `/tenders`, `/tenders/[id]`, `/tenders/upload` | List, full analysis detail, and ingestion. |
-| `/projects` | Past-project corpus that similarity matching scores against. |
-| `/turnover` | Company turnover evidence used by eligibility screening. |
-| `/admin`, `/admin/role-assignments` | Administration. |
+| `/dashboard` | Portfolio overview, eligibility breakdown, screening backlog. |
+| `/tenders`, `/tenders/[id]`, `/tenders/upload` | List, screening detail, and ingestion. |
+| `/projects` | Past-project corpus that stage B scores against. |
+| `/turnover` | Certified turnover evidence, MANAGER+. |
+| `/admin`, `/admin/role-assignments`, `/admin/audit-logs` | User and role management, pre-provisioning, and the audit trail. |
 | `/profile` | The signed-in user's account. |
 | `/design/tokens`, `/design/primitives` | Live theme and component reference. `noindex`, but publicly served. |
 
@@ -256,24 +293,25 @@ offline fallback over failure, an audit entry on every state change.
 
 ## API
 
-OpenAPI lives at `http://localhost:8000/docs`. A full endpoint-to-screen map is in
-[frontend/docs/api-map.md](frontend/docs/api-map.md).
+OpenAPI lives at `http://localhost:8000/docs`. 47 paths.
 
 | Group | Endpoints |
 | --- | --- |
-| Auth | `POST /auth/google` · `POST /auth/refresh` · `POST /auth/logout` · `GET /auth/me` |
+| Auth | `POST /auth/register` · `POST /auth/login` · `POST /auth/google` · `POST /auth/refresh` · `POST /auth/logout` · `GET /auth/me` |
 | Tenders | `GET\|POST /tenders` · `GET\|PATCH\|DELETE /tenders/{id}` · `POST /tenders/import` |
-| Pipeline | `POST /tenders/{id}/extract` · `POST /tenders/{id}/analyze` · document download and retrigger |
-| Decisions | `GET /tenders/{id}/recommendation` · `/metadata` · `/boq` · `/matches` · `/report` |
-| Reviews | `GET /tenders/{id}/reviews` · `GET /reviews/pending` |
-| Projects | Past-project CRUD |
-| Admin | Users, roles, role assignments, audit logs, API usage, system health |
-| Platform | `GET /stats` (any signed-in user) · `GET /health` · `GET /metrics` |
+| Documents | `POST /tenders/{id}/documents` · `.../upload` · `GET /tenders/{id}/documents` · `GET /documents/{id}` · `POST /documents/{id}/retrigger` |
+| Extraction | `POST /tenders/{id}/extract` · `GET /tenders/{id}/metadata` · `GET /tenders/{id}/boq` |
+| Screening | `POST\|GET /api/v1/tenders/{id}/eligibility` |
+| Past projects | CRUD · `POST /api/v1/projects/import` · `POST /projects/backfill` · work-type tags |
+| Turnover | `GET\|POST /api/v1/company-turnover` · `PATCH /{financial_year}` · `POST /import` — MANAGER+ |
+| Retirement | `GET /api/v1/tenders/retirement/preview` · `POST /api/v1/tenders/retirement` — ADMIN |
+| Admin | Users, role assignments, `GET /admin/audit-logs`, `/stats`, `/system-health`, `/api-usage` |
+| Platform | `GET /stats` (any signed-in user) · `GET /health` · `GET /metrics` (Basic Auth) · `POST /observability/logs` |
 
-`GET /stats` returns tender totals by lifecycle state, past-project count and
-pending reviews to any authenticated user. `GET /admin/stats` is separate and
-`ADMIN`-only — it carries user and account figures that `/stats` deliberately
-omits.
+`GET /stats` returns tender totals by lifecycle state, an eligibility breakdown,
+the past-project count and the screening backlog to any authenticated user.
+`GET /admin/stats` is separate and ADMIN-only — it carries user and account figures
+that `/stats` deliberately omits.
 
 ---
 
@@ -287,17 +325,16 @@ All configuration comes from the environment. Three templates:
 | [.env.frontend.example](.env.frontend.example) | `frontend/.env.local` | `next dev` / `next build` on the host |
 | [.env.example](.env.example) | `.env` | Docker Compose only, for its `${...}` substitutions |
 
-`setup` creates all three. Every backend setting has a default, so nothing crashes
-on a missing variable in local mode — but several matter in practice:
+Every backend setting has a default, so nothing crashes on a missing variable in
+local mode. These matter in practice:
 
 | Variable | Why it matters |
 | --- | --- |
 | `GOOGLE_CLIENT_ID` | Optional Google sign-in. When set, it must match `NEXT_PUBLIC_GOOGLE_CLIENT_ID` because the backend verifies the token audience. |
 | `ALLOWED_EMAIL_DOMAINS` | Empty rejects every sign-in. |
-| `BOOTSTRAP_SUPER_ADMIN_EMAIL` | Read by migration `d4a1e9c5b872` to seed the first administrator. Set it *before* migrating. |
+| `BOOTSTRAP_SUPER_ADMIN_EMAIL` | Read by migration `d4a1e9c5b872`. Set it *before* migrating. |
 | `JWT_SECRET` | Generated by `setup`. Must be ≥32 characters and not the template default. |
-| `DATABASE_URL` | Host is `postgres` under Compose, `localhost` natively. `setup` handles this. |
-| `GEMINI_API_KEY` | Optional. Without it the AI analyst degrades rather than failing. |
+| `DATABASE_URL` | Host is `postgres` under Compose, `localhost` natively. |
 | `EMBEDDING_BACKEND` | `fastembed` downloads a model on first boot; `hash` is deterministic and fully offline. |
 | `QDRANT_API_KEY` | Required with Qdrant Cloud; leave blank for local Qdrant. |
 | `METRICS_PASSWORD` | Separate Basic Auth secret for `/metrics`; production rejects the template value when metrics are enabled. |
@@ -309,33 +346,11 @@ on a missing variable in local mode — but several matter in practice:
 Production release gates are enforced at startup when `ENVIRONMENT=production`:
 `JWT_SECRET` must be strong, `DATABASE_URL` and `CORS_ALLOW_ORIGINS` must be
 explicitly supplied, the database must be PostgreSQL, CORS cannot contain `*`,
-`ALLOWED_EMAIL_DOMAINS` must contain at least one domain, and enabled metrics
-must use a separate password of at least 16 characters.
+`ALLOWED_EMAIL_DOMAINS` must contain at least one domain, and enabled metrics must
+use a separate password of at least 16 characters.
 
-Required production values are:
-
-| Service | Required | Conditional or optional |
-| --- | --- | --- |
-| Backend | `ENVIRONMENT=production`, `DATABASE_URL`, `CORS_ALLOW_ORIGINS`, `JWT_SECRET`, `ALLOWED_EMAIL_DOMAINS` | `QDRANT_URL` and `QDRANT_API_KEY` for Qdrant Cloud; `METRICS_PASSWORD` when metrics are enabled; `BOOTSTRAP_SUPER_ADMIN_EMAIL` for first-admin provisioning; Google, Gemini, Sentry, and OTLP settings are optional. |
-| Frontend build | `NEXT_PUBLIC_API_BASE_URL` | `NEXT_PUBLIC_GOOGLE_CLIENT_ID` and `NEXT_PUBLIC_HERO_VIDEO` are optional. |
-| Docker Compose | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `NEXT_PUBLIC_API_BASE_URL` | Public Google and hero-video build values are optional. |
-
-All supported settings, defaults, and safe placeholders are listed in the three
-environment templates. Provider `postgres://` and `postgresql://` URLs are
-normalized to SQLAlchemy's asyncpg scheme at startup.
-
-### Pre-provisioning roles
-
-To give someone a role above `EMPLOYEE` before their first sign-in, copy
-[scripts/seed_role_assignments.example.sql](scripts/seed_role_assignments.example.sql),
-put your addresses in it, and run it once after migrating:
-
-```bash
-docker compose exec -T postgres psql -U tender -d tender_intel < scripts/seed_role_assignments.sql
-```
-
-The list is consulted once, at account creation, and never again. Live users are
-changed with `PATCH /admin/users/{id}/role` instead.
+Provider `postgres://` and `postgresql://` URLs are normalised to SQLAlchemy's
+asyncpg scheme at startup.
 
 ---
 
@@ -344,8 +359,8 @@ changed with `PATCH /admin/users/{id}/role` instead.
 ```bash
 # Backend — from backend/
 pytest                    # no live database needed; integration tests use in-memory SQLite
-ruff check .
-ruff format --check .
+ruff check src tests
+ruff format --check src tests
 mypy src                  # strict
 
 # Frontend — from frontend/
@@ -354,8 +369,11 @@ npm run typecheck
 npm run build
 ```
 
-CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs exactly these on
-every push to `main` and every pull request.
+555 tests pass. CI
+([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs exactly these on
+every push to `main` and every pull request, plus a third job that applies the
+whole Alembic chain to an empty PostgreSQL database and asserts `audit_logs`
+survives — the check that catches a migration which only works against SQLite.
 
 Backend tests need no external services: the integration suite runs against
 in-memory SQLite, an in-memory Qdrant and a deterministic hash embedding
@@ -377,9 +395,13 @@ need `backend/.env` present. Under Compose:
 docker compose run --rm backend alembic upgrade head
 ```
 
-The backend container runs `alembic upgrade head` before uvicorn. Native startup
-must run the Alembic command explicitly. For multi-replica paid deployments,
-move migrations into the platform's single pre-deploy job before scaling out.
+The chain is linear with a single head. `f0e1d2c3b4a5` makes its own `downgrade`
+raise `NotImplementedError` — the review and notification data it dropped cannot
+be reconstructed — so a downgrade past it is not a supported operation.
+`b1a4c7e2d903` restores the audit trail that same revision removed.
+
+For multi-replica paid deployments, move migrations into the platform's single
+pre-deploy job before scaling out.
 
 ---
 
@@ -397,8 +419,8 @@ part of CI.
 | `check-contrast.mjs` | Every required colour pairing meets WCAG AA. No server needed. |
 | `measure-lcp.mjs` | LCP with every candidate in order; `--throttle` for Fast-3G. |
 | `smoke-screens.mjs` | Every authenticated screen renders against mocked API fixtures. |
-| `conformance-{static,runtime,states}.mjs` | Source structure, rendered-DOM contrast, and loading / empty / error states. |
-| `e2e-{live,roles,crud,lifecycle}.mjs` | The app and a real backend agree. |
+| `conformance-{static,runtime,states}.mjs` | Source structure, rendered-DOM contrast, loading / empty / error states. |
+| `e2e-{live,roles,crud}.mjs` | The app and a real backend agree. |
 | `test-hero-fallback.mjs` | The landing page survives the hero video failing to load. |
 | `verify-deploy.mjs <site> <apiOrigin>` | A deployed build renders, hydrates, guards routes, and dials the configured API origin. |
 
@@ -408,14 +430,7 @@ prerequisite: `npx playwright install chromium`.
 
 Captures are deterministic because the script freezes CSS and Framer animation
 *and* pauses every `<video>` at frame 0 — without the video freeze, two captures
-of an unchanged build differ by roughly 6% of pixels, enough noise to hide a real
-regression.
-
-The landing hero video is the only asset on that page fetched over the network,
-so it is the only thing that can fail. When it does, `HeroVisual.tsx` swaps in a
-self-hosted DOM panel. `onError` alone is insufficient — the `<video>` is
-server-rendered, so a failure fires before hydration and media errors do not
-bubble; the component checks `el.error` and `networkState` on mount as well.
+of an unchanged build differ by roughly 6% of pixels.
 
 ---
 
@@ -423,148 +438,55 @@ bubble; the component checks `el.error` and `networkState` on mount as well.
 
 ### Local production-shaped deployment
 
-Copy the three environment templates, replace all production placeholders, then:
-
 ```bash
 docker compose up -d --build --wait
 curl http://localhost:8080/health
 ```
 
-The backend container applies `alembic upgrade head` before uvicorn starts. The
-nginx entry point is `http://localhost:8080`; uploaded documents and both data
-stores use named volumes. Review logs with `docker compose logs -f` and stop the
-stack with `docker compose down` (do not add `-v` unless deleting all local data
-is intentional).
+The backend container applies `alembic upgrade head` before uvicorn starts and
+fails fast if the migration fails. Uploaded documents and both data stores use
+named volumes. `docker compose down` without `-v` preserves them.
 
-### No-cost deployment recommendation
+### No-cost deployment
 
-For a public demo or low-traffic MVP, use a split deployment:
+A split topology has checked-in configuration:
 
-- **Frontend:** Netlify Free, using the checked-in `netlify.toml`.
-- **API:** Render Free, using the checked-in `render.yaml` and backend Dockerfile.
-- **PostgreSQL:** Neon Free.
-- **Vector search:** Qdrant Cloud Free.
+| Piece | Platform | Config |
+| --- | --- | --- |
+| Frontend | Netlify Free | `netlify.toml` (repo root, base `frontend`, publish `.next`) |
+| API | Render Free | `render.yaml` + `backend/Dockerfile` |
+| PostgreSQL | Neon Free | — |
+| Vector search | Qdrant Cloud Free | — |
 
-This is the best verified no-cost fit for the current stack, but it is not a
-production SLA. Render explicitly positions free web services as preview/hobby
-compute: they sleep after 15 idle minutes, can take about a minute to wake, have
-an ephemeral filesystem, and share 750 instance-hours per month. The Hobby
-workspace includes 5 GB outbound bandwidth and 500 build-pipeline minutes.
-[Render free limits](https://render.com/docs/free) ·
-[Render bandwidth](https://render.com/docs/outbound-bandwidth) ·
-[Render build limits](https://render.com/docs/build-pipeline)
+`NEXT_PUBLIC_API_BASE_URL` must be the **bare origin** — scheme and host only, no
+trailing `/api`. The backend mounts routers under two prefixes (`/tenders/...` and
+`api/v1/tenders/...`) and the client appends both verbatim, so only the bare origin
+resolves both. The `/api` suffix is a Docker Compose convention that nginx strips.
 
-The application currently stores tender documents on the API filesystem. On a
-free Render service those files disappear on a restart, redeploy, or spin-down.
-PostgreSQL rows remain in Neon and vectors remain in Qdrant, but document-file
-durability requires a paid persistent disk or a future object-storage adapter.
-Do not treat the no-cost topology as production for irreplaceable tenders.
+Render Free sleeps after 15 idle minutes, wakes in about a minute, has an
+ephemeral filesystem, and shares 750 instance-hours per month. This is a
+demonstration topology, not a production SLA.
 
-### Free-tier comparison verified 8 September 2026
-
-| Platform | Relevant free limits | Sleep or cold start | Bandwidth and builds | Database and files | Custom domain | Card | Fit |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| **Netlify Free** | 300 credits/month; a production deploy costs 15 credits | Static assets stay edge-served; dynamic Next compute consumes credits | 20 credits/GB bandwidth and 2 credits/10k requests; the account pauses at the limit | Basic Netlify Database exists, but this project already uses external PostgreSQL and Qdrant | Included with SSL | Not required for Free | Best frontend option; commercial projects are allowed and `netlify.toml` is ready. [Pricing](https://www.netlify.com/pricing/) |
-| **Render Free** | 512 MB per free web instance; 750 shared instance-hours/month | Sleeps after 15 minutes; wake-up is about one minute | Hobby includes 5 GB bandwidth and 500 pipeline minutes | Filesystem is ephemeral; free Render Postgres expires after 30 days, so use Neon | Two Hobby domains; TLS included | Not required; services suspend instead of charging without one | Best API demo option because it runs the existing Dockerfile and supports health checks. [Free services](https://render.com/docs/free) |
-| **Koyeb Free** | One 512 MB, 0.1 vCPU web service with 2 GB ephemeral SSD | Scales to zero after one idle hour | Outbound transfer is metered; free compute cannot use volumes or worker services | Free PostgreSQL is limited to 5 active hours/month and 1 GB | Supported | Required, including a temporary authorization hold | Technically compatible but weaker than Render for this app and inconvenient without a card. [Instances](https://www.koyeb.com/docs/reference/instances) · [Pricing FAQ](https://www.koyeb.com/docs/faqs/pricing) |
-| **Vercel Hobby** | 4 active CPU-hours, 360 GB-hours memory and up to 60-second functions | Serverless functions may cold start | Typical guideline: 100 GB fast transfer and 100 build hours | External PostgreSQL/Qdrant required; local files are not durable | Supported | Not required until upgrading | Excellent Next.js hosting, but Hobby is restricted to personal non-commercial use, so it is not valid for this company app. [Hobby plan](https://vercel.com/docs/plans/hobby) · [Fair use](https://vercel.com/docs/limits/fair-use-guidelines) |
-| **Railway Free** | $5 trial credit for 30 days, then $1/month | No enduring zero-cost promise | 10-minute builds after trial on Free | 0.5 GB volume after trial | No custom domain after trial | Not required for the trial | Existing deployment notes targeted Railway, but it is no longer genuinely free. [Pricing](https://railway.com/pricing) |
-
-Neon Free currently provides 100 CU-hours and 0.5 GB storage per project,
-with no time limit or card requirement. Qdrant Cloud Free provides one node with
-0.5 vCPU, 1 GB RAM, and 4 GB disk without a card; an unused cluster is suspended
-after one week and deleted after four weeks unless reactivated.
-[Neon pricing](https://neon.com/pricing) ·
-[Qdrant free cluster](https://qdrant.tech/documentation/cloud/create-cluster/)
-
-### Exact no-cost deployment steps
-
-1. **Create PostgreSQL.** Create a Neon Free project in a region near the API.
-   Copy its pooled connection string. The backend accepts provider URLs beginning
-   with `postgres://` or `postgresql://` and selects the asyncpg driver itself.
-2. **Create vector storage.** Create a Qdrant Cloud Free cluster, then copy its
-   HTTPS cluster URL and API key. Keep the cluster active or reactivate it before
-   the four-week inactivity deletion point.
-3. **Deploy the API.** In Render choose **New > Blueprint**, connect this repository,
-   and select `render.yaml`. Supply the prompted values:
-
-   ```dotenv
-   DATABASE_URL=<Neon pooled connection string>
-   CORS_ALLOW_ORIGINS=https://temporary.invalid
-   ALLOWED_EMAIL_DOMAINS=example.com
-   BOOTSTRAP_SUPER_ADMIN_EMAIL=admin@example.com
-   QDRANT_URL=https://your-cluster.cloud.qdrant.io
-   QDRANT_API_KEY=<Qdrant API key>
-   ```
-
-   Render generates `JWT_SECRET`; the Blueprint disables public metrics on the
-   constrained free service, uses hash embeddings to stay inside 512 MB, runs
-   migrations during container startup, and checks `/health`. Record the final
-   `https://...onrender.com` API URL.
-4. **Deploy the frontend.** In Netlify import the same repository. The root
-   `netlify.toml` sets base directory `frontend`, build command `npm run build`,
-   and publish directory `.next`. Add these build environment variables before
-   the first production deploy:
-
-   ```dotenv
-   NEXT_PUBLIC_API_BASE_URL=https://your-api.onrender.com
-   NEXT_PUBLIC_GOOGLE_CLIENT_ID=
-   NEXT_PUBLIC_HERO_VIDEO=/video/hero.mp4
-   ```
-
-   `NEXT_PUBLIC_API_BASE_URL` must be the **bare origin** ΓÇö scheme and host only, no
-   trailing `/api`. The backend mounts routers under two prefixes (`/tenders/...` and
-   `/api/v1/tenders/...`) and the client appends both verbatim, so only the bare origin
-   resolves both. The `/api` suffix is a Docker Compose convention that nginx strips.
-
-   Record the final `https://...netlify.app` URL. `NEXT_PUBLIC_*` values are
-   compiled into the browser bundle, so every change requires a new frontend build.
-5. **Lock down CORS.** Replace Render's temporary `CORS_ALLOW_ORIGINS` value with
-   the exact Netlify origin (scheme and hostname only, no trailing slash), then
-   redeploy the API. Add a custom frontend origin to the comma-separated list if used.
-6. **Optional Google sign-in.** Set the same client ID as `GOOGLE_CLIENT_ID` on
-   Render and `NEXT_PUBLIC_GOOGLE_CLIENT_ID` on Netlify. Add the Netlify and custom
-   frontend origins to the OAuth Web Client's Authorized JavaScript origins, then
-   rebuild the frontend. Email/password works without Google.
-7. **Post-deployment verification.** Confirm the API `/health` returns HTTP 200;
-   confirm an `OPTIONS /auth/login` request from the frontend receives the exact
-   `Access-Control-Allow-Origin`; register the bootstrap address; create a tender;
-   and verify dashboard, admin, and role-protected screens. Expect the first API
-   request after idle time to wait for Render's cold start.
-
-   Then run the bundled browser check against the live site:
-
-   ```bash
-   cd frontend
-   node scripts/verify-deploy.mjs https://your-site.netlify.app https://your-api.onrender.com
-   ```
-
-   It proves the page renders and hydrates without console errors, that anonymous
-   `/dashboard` redirects to `/login`, and that every API call is dialled at the
-   configured origin with no doubled slashes.
-
-### Production secrets
-
-Set secrets in Render's environment settings, never in `render.yaml`, Netlify,
-or source control. `DATABASE_URL`, `JWT_SECRET`, `QDRANT_API_KEY`, optional
-`GEMINI_API_KEY`, optional `GOOGLE_CLIENT_ID`, `BOOTSTRAP_SUPER_ADMIN_EMAIL`, and
-any observability DSNs belong on the API. Only `NEXT_PUBLIC_*` values belong on
-Netlify; they are public by design. If enabling `/metrics`, also set a unique
-`METRICS_PASSWORD` of at least 16 characters.
+**Document durability caveat.** The application stores tender documents on the
+API filesystem. On a free Render service those files disappear on restart,
+redeploy or spin-down. Rows remain in Neon and vectors in Qdrant, but file
+durability needs a paid persistent disk or a future object-storage adapter.
 
 ### Rollback
 
-- **Frontend:** In Netlify Deploys, select the previous known-good production
+- **Frontend:** in Netlify Deploys, select the previous known-good production
   deploy and publish it.
-- **API:** In Render Events, roll back to one of the two retained previous free
+- **API:** in Render Events, roll back to one of the two retained previous free
   deploys. Verify `/health` before sending users back.
-- **Database:** Prefer a Neon restore/branch from before the migration. Do not run
-  an Alembic downgrade against production until its data-loss behavior has been
-  reviewed and a backup exists. Keep application and schema changes backward
-  compatible for at least one release so an application-only rollback remains safe.
-- **After rollback:** Recheck CORS, login, one authenticated list route, and a
+- **Database:** prefer a Neon restore/branch from before the migration. Do not run
+  an Alembic downgrade against production until its data-loss behaviour has been
+  reviewed and a backup exists — and note that downgrading past `f0e1d2c3b4a5`
+  raises by design.
+- **After rollback:** recheck CORS, login, one authenticated list route, and a
   tender detail route. If a frontend environment value changed, rebuild rather
   than only republishing an older bundle.
+
+---
 
 ## Security
 
@@ -572,25 +494,44 @@ Netlify; they are public by design. If enabling `/metrics`, also set a unique
   checked against the configured client ID as the audience boundary. Publishing
   the Google client ID is safe; it is a public identifier, not a secret.
 - The Google client secret is genuinely unused by this flow. Leave it unset.
-- Account admission is fail-closed. Deactivation is the offboarding control, and
-  a deactivated account is refused even on an allowed domain.
-- Every state change is audit-logged.
+- Account admission is fail-closed. Deactivation is the offboarding control, and a
+  deactivated account is refused even on an allowed domain.
+- **Every state change is audit-logged.** `audit_logs` is append-only; the ORM
+  registers no update or delete path, and `actor_id` carries no foreign key so
+  deleting a user never cascades away the trail of what they did.
 - Browser log ingestion accepts anonymous callers by design — sign-in and landing
   errors happen before anyone holds a token — so a per-user, per-address rate
-  limit is what keeps it from being an open write sink.
+  limit is what keeps it from being an open write sink. Behind the shipped nginx
+  every anonymous caller shares the proxy's address and therefore one bucket;
+  this is a documented limitation, not a security boundary.
 - [.gitignore](.gitignore) covers `.env` files, OAuth client JSON, PEM keys and
   pasted credential notes. Never commit a real `.env`.
 
-## Asset licensing
+---
 
-| Asset | Status |
-| --- | --- |
-| Outfit, Fustat, Inter | Google Fonts (SIL OFL), self-hosted at build by `next/font`. |
-| `public/video/hero.mp4` | **Licence cleared by the project owner, 2026-08-18.** Self-hosted since; override with `NEXT_PUBLIC_HERO_VIDEO`. |
-| `public/fonts/*.woff2` (Supreme, Bespoke Stencil) | Fontshare / Indian Type Foundry; self-hosting cleared by the owner. Superseded and no longer referenced. |
-| `public/spline/scene.splinecode` | **Licensing unconfirmed.** Currently unused, so the question is moot unless it is reintroduced. |
+## Known limitations
 
-The hero video is 960×960 but renders at 600px, so it carries roughly 2.5× the
-pixels needed. Re-encoding to 600×600 (and/or a WebM/AV1 alternate source) is the
-remaining lever on landing-page LCP; it has not been done, because re-encoding the
-owner's asset is their call.
+Honest list of what is incomplete or surprising.
+
+1. **`ANALYZED` and `REVIEWED` are unreachable.** Both states and every edge
+   between them are still defined, and no code path reaches either. They are kept
+   so existing rows stay readable and filterable. A future bid-decision feature
+   would need to reintroduce the queue that `f0e1d2c3b4a5` removed.
+2. **Re-extraction destroys manual corrections.** `ExtractionService.extract`
+   builds a fresh `TenderMetadata` and upserts it, overwriting all ten fields.
+   Since the correction endpoint was removed there is currently no way to make a
+   manual correction, so this is latent rather than active — but it will bite the
+   moment one is added.
+3. **`COMPANY_NET_WORTH` does not exist.** It was retired (FR-303) along with the
+   net-worth qualification rule. `thresholds.py` no longer defines it.
+4. **`GEMINI_API_KEY` is inert.** The settings and the LLM port exist, but no
+   service constructs an LLM provider and no analyst narrative is generated. The
+   `AnalystReport` DTO was removed.
+5. **`tender_metadata.fields` holds ten fields in one JSON column.** Manual
+   correction of an individual field is not supported at the API level.
+6. **`/tenders/{id}/boq/analytics` was removed.** BOQ items are readable; the
+   aggregate summary endpoint is not.
+7. **`.github/workflows/ci.yml` exists now.** It did not for most of this
+   repository's history, which is why a 62-test failure count went unnoticed.
+   Playwright verification scripts are still not in CI — they need a browser and
+   a running stack.

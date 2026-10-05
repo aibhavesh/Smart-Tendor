@@ -200,6 +200,63 @@ async def test_register_creates_an_employee_and_signs_in(client, app_db):
     assert me.json()["role"] == "EMPLOYEE"
 
 
+async def test_the_floor_role_needs_no_configuration(client, app_db):
+    """Nobody is promoted by signing up, on any account, ever.
+
+    This is the security property the whole role model rests on: self-registration
+    is open to anyone who can receive mail at an allowed domain, so the default
+    must be the lowest role. If this test ever fails, every new account is being
+    handed elevated access by default.
+    """
+    for i in range(3):
+        resp = await client.post(
+            "/auth/register",
+            json={
+                "email": f"newcomer{i}@{ORG_DOMAIN}",
+                "password": "correct-horse-battery",
+                "full_name": f"Newcomer {i}",
+            },
+        )
+        assert resp.status_code == 201
+
+    admin = bearer(app_db, await seed_user(app_db, email="root@x.com", role=UserRole.SUPER_ADMIN))
+    listing = await client.get("/admin/users", headers=admin)
+    assert listing.status_code == 200
+    newcomers = [u for u in listing.json()["items"] if u["full_name"].startswith("Newcomer")]
+    assert len(newcomers) == 3
+    assert {u["role"] for u in newcomers} == {"EMPLOYEE"}
+
+
+async def test_a_promoted_account_keeps_its_new_role_across_sign_ins(client, app_db):
+    """The floor is set at creation and only ever moved deliberately.
+
+    Guards against a role change being mistaken for something transient: signing
+    in again must not re-derive the role from the elevation list, or a
+    promotion would silently undo itself.
+    """
+    # Promote the account registration just created, rather than seeding a second
+    # row at the same address — `users.email` is unique.
+    created = await _register(client)
+    assert created.status_code == 201
+    target = await get_user_by_email(app_db, ORG_EMAIL)
+
+    admin = bearer(app_db, await seed_user(app_db, email="root@x.com", role=UserRole.SUPER_ADMIN))
+    promoted = await client.patch(
+        f"/admin/users/{target.id}/role", json={"role": "MANAGER"}, headers=admin
+    )
+    assert promoted.status_code == 200
+    assert promoted.json()["role"] == "MANAGER"
+
+    login = await client.post(
+        "/auth/login", json={"email": ORG_EMAIL, "password": "correct-horse-battery"}
+    )
+    assert login.status_code == 200
+    me = await client.get(
+        "/auth/me", headers={"Authorization": f"Bearer {login.json()['access_token']}"}
+    )
+    assert me.json()["role"] == "MANAGER"
+
+
 async def test_register_never_stores_the_plaintext_password(client, app_db):
     await _register(client)
     stored = await get_user_by_email(app_db, ORG_EMAIL)

@@ -26,7 +26,16 @@ import { fetchDashboard, type DashboardData } from "@/lib/dashboard";
 import { TenderStatusTag } from "@/components/tenders/TenderStatusTag";
 
 /** A count that failed to load renders as UNKNOWN, never as a misleading zero. */
-function StatTile({ label, value }: { label: string; value: number | null | undefined }) {
+function StatTile({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: number | null | undefined;
+  /** Optional clarifier. Rendered under the value so the number stays dominant. */
+  hint?: string;
+}) {
   return (
     <div className="rounded-tile border border-ink-strong/10 bg-surface/60 px-4 py-3.5">
       <p className="text-nano font-semibold tracking-wide text-ink-muted">{label.toUpperCase()}</p>
@@ -39,6 +48,7 @@ function StatTile({ label, value }: { label: string; value: number | null | unde
           </p>
         )}
       </div>
+      {hint ? <p className="mt-1 text-nano text-ink-muted">{hint}</p> : null}
     </div>
   );
 }
@@ -106,17 +116,21 @@ function DashboardBody() {
 
       {/* Role-appropriate KPIs: the same board would be either useless to a viewer or
           missing the queue a manager opens this screen for. */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatTile label="Tenders" value={data.stats.tenders_total} />
         <StatTile label="Eligible" value={data.stats.eligibility_by_status.ELIGIBLE ?? 0} />
         <StatTile label="Not eligible" value={data.stats.eligibility_by_status.NOT_ELIGIBLE ?? 0} />
+        <StatTile
+          label="Awaiting screening"
+          value={data.stats.screening_pending}
+          hint="Recorded but not yet screened"
+        />
       </div>
 
       {isAdmin && data.platform ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           <StatTile label="Active users" value={data.platform.users_active} />
           <StatTile label="Total users" value={data.platform.users_total} />
-          <StatTile label="Reviews" value={data.platform.reviews_total} />
           <StatTile label="Documents" value={data.platform.documents_total} />
         </div>
       ) : null}
