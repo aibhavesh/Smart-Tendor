@@ -184,9 +184,6 @@ export function Navbar() {
               <AccountMenu name={user?.full_name || "Account"} />
             ) : status === "anonymous" ? (
               <>
-                {/* Both routes lead to /login now: signing in with a work Google account
-                    IS the sign-up, so offering two destinations would imply a choice
-                    that does not exist. */}
                 <Link
                   href="/login"
                   className="h-9 px-4 rounded-control text-ui font-semibold hidden sm:flex items-center text-ink-strong/60 hover:text-ink-strong hover:bg-ink-strong/5 transition-colors"
@@ -195,7 +192,7 @@ export function Navbar() {
                 </Link>
 
                 <Link
-                  href="/login"
+                  href="/register"
                   className="group h-9 px-5 rounded-control bg-ink-strong/5 hover:bg-ink-strong/10 border border-ink-strong/10 text-ui font-semibold hidden sm:flex items-center gap-2 text-ink-strong transition-all hover:shadow-md"
                 >
                   Get started
@@ -303,7 +300,7 @@ export function Navbar() {
                 ) : status === "anonymous" ? (
                   <>
                     <Link
-                      href="/login"
+                      href="/register"
                       onClick={() => setMenuOpen(false)}
                       className="h-10 w-full rounded-control bg-brand-hover hover:bg-brand-deep text-white text-ui font-semibold flex items-center justify-center gap-2 transition-colors"
                     >

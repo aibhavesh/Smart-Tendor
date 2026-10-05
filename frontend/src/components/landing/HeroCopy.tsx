@@ -25,12 +25,12 @@ export function HeroCopy() {
    * Signed in, the CTA is not an invitation to sign up — it is the way into the work, so
    * it opens the screen that takes a tender and its document.
    *
-   * "loading" keeps the sign-in target: it is the safe guess for a first-time visitor,
-   * and a signed-in reader landing on /login is one click from where they meant to be.
-   * There is no separate sign-up — the first Google sign-in creates the account.
+   * "loading" keeps the registration target: it is the safe guess for a first-time
+   * visitor, while the auth state then switches a returning reader to their work.
+   * Registration supports either email/password or Google sign-in.
    */
   const { status } = useAuth();
-  const ctaHref = status === "authenticated" ? "/tenders/upload" : "/login";
+  const ctaHref = status === "authenticated" ? "/tenders/upload" : "/register";
 
   return (
     <motion.div

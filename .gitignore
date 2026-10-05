@@ -84,3 +84,6 @@ next-env.d.ts
 Thumbs.db
 .claude
 .claude/settings.json
+
+# Local Netlify folder
+.netlify
