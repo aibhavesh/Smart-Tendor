@@ -47,9 +47,17 @@ from tender_intel.infrastructure.repositories.eligibility_repo import (
 )
 from tender_intel.infrastructure.repositories.project_repo import SqlAlchemyPastProjectRepository
 from tender_intel.infrastructure.repositories.work_type_repo import SqlAlchemyWorkTypeRepository
-from tender_intel.infrastructure.seed.work_type_seed import SeedValidationError, load_seed_file
+from tender_intel.infrastructure.seed.work_type_seed import (
+    PACKAGED_SEED,
+    SeedValidationError,
+    load_seed_file,
+)
 
-DEFAULT_SEED = Path(__file__).resolve().parents[2] / "work_types_seed.json"
+#: Defaults to the copy shipped inside the package, so this script works against
+#: a running container as well as a checkout. The old repository-root default was
+#: unreachable from the deployed image, where the backend build context is
+#: ``./backend`` and a file above it is never copied in.
+DEFAULT_SEED = PACKAGED_SEED
 
 
 def _parse_args() -> argparse.Namespace:

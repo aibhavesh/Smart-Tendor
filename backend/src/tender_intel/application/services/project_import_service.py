@@ -22,7 +22,6 @@ evidence is worse than an absent one.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
@@ -34,12 +33,11 @@ from tender_intel.application.dto.project_import import (
     ProjectRowResult,
 )
 from tender_intel.application.services.past_project_service import PastProjectService
+from tender_intel.application.services.work_type_seed_service import WorkTypeSeedService
 from tender_intel.application.services.work_type_service import WorkTypeService
-from tender_intel.domain.decision.normalise import tokenise
-from tender_intel.domain.decision.work_type_match import WorkTypeCandidate, match_work_types
+from tender_intel.application.services.work_type_tagger import WorkTypeTagger
+from tender_intel.domain.decision.work_type_match import WorkTypeCandidate
 from tender_intel.domain.entities import AuditLog, PastProject
-from tender_intel.domain.enums.eligibility import MatchGrade
-from tender_intel.domain.enums.work_type import WorkTypeLinkSource
 from tender_intel.domain.exceptions import DomainValidationError
 from tender_intel.domain.interfaces.repositories import (
     AuditLogRepository,
@@ -63,14 +61,6 @@ _log = get_logger(__name__)
 WORKBOOK_SUFFIXES = (".xlsx",)
 
 
-@dataclass(frozen=True, slots=True)
-class _Tagging:
-    """What the cascade concluded for one project."""
-
-    linked: int
-    considered: tuple[str, ...]
-
-
 class ProjectImportService:
     def __init__(
         self,
@@ -80,12 +70,15 @@ class ProjectImportService:
         work_type_repo: WorkTypeRepository,
         project_repo: PastProjectRepository,
         audits: AuditLogRepository,
+        seed: WorkTypeSeedService,
     ) -> None:
         self._projects = projects
         self._project_repo = project_repo
         self._work_types = work_types
         self._work_type_repo = work_type_repo
         self._audits = audits
+        self._seed = seed
+        self._tagger = WorkTypeTagger(work_types=work_type_repo, service=work_types)
 
     async def import_files(
         self,
@@ -99,7 +92,16 @@ class ProjectImportService:
     ) -> ProjectImportResult:
         """Import every file, isolating failures to the file that caused them."""
         result = ProjectImportResult()
+        # Provision before building candidates. Candidates are read from the
+        # taxonomy once for the whole batch, so an empty taxonomy here would
+        # silently tag every row zero times and report the whole file as a
+        # success.
+        provisioned = None
+        if auto_tag:
+            provisioned = await self._seed.ensure_taxonomy()
         candidates = await self._candidates() if auto_tag else []
+        result.taxonomy_work_types = len(candidates)
+        result.taxonomy_provisioned = provisioned.work_types_created if provisioned else 0
 
         for filename, content in files:
             result.files.append(await self._import_one(filename, content, candidates, actor_id))
@@ -212,7 +214,7 @@ class ProjectImportService:
         candidates: list[WorkTypeCandidate],
         actor_id: UUID,
     ) -> ProjectRowResult:
-        tagging = await self._tag(project, candidates, actor_id)
+        tagging = await self._tagger.tag(project, candidates, actor_id)
         missing = self._missing_for_eligibility(project, tagging.linked)
         message: str | None = None
         if tagging.considered:
@@ -228,47 +230,6 @@ class ProjectImportService:
             missing_for_eligibility=missing,
         )
 
-    async def _tag(
-        self,
-        project: PastProject,
-        candidates: list[WorkTypeCandidate],
-        actor_id: UUID,
-    ) -> _Tagging:
-        if not candidates:
-            return _Tagging(0, ())
-        scope = " ".join(
-            part
-            for part in (project.name, project.category, project.description)
-            if part is not None and part.strip()
-        )
-        if not scope.strip():
-            return _Tagging(0, ())
-
-        linked = 0
-        considered: list[str] = []
-        for match in match_work_types(scope, candidates):
-            if match.grade is MatchGrade.MATCHED:
-                try:
-                    await self._work_types.tag_project(
-                        project.id,
-                        match.work_type_id,
-                        source=WorkTypeLinkSource.INFERRED,
-                        confidence=match.score,
-                        evidence=f"bulk import: {match.method.value} match on project name",
-                        actor_id=actor_id,
-                    )
-                    linked += 1
-                except Exception as exc:  # a tag failure is not an import failure
-                    _log.warning(
-                        "project_import.tag_failed",
-                        project_id=str(project.id),
-                        work_type=match.code,
-                        error=str(exc),
-                    )
-            elif match.grade is MatchGrade.REVIEW:
-                considered.append(f"{match.code} ({match.score})")
-        return _Tagging(linked, tuple(considered))
-
     @staticmethod
     def _missing_for_eligibility(project: PastProject, linked: int) -> tuple[str, ...]:
         """Name every reason stage B will ignore this project."""
@@ -283,25 +244,7 @@ class ProjectImportService:
 
     async def _candidates(self) -> list[WorkTypeCandidate]:
         """Build the stage A candidate set once for the whole batch."""
-        active = await self._work_type_repo.list_active()
-        if not active:
-            return []
-        aliases = await self._work_type_repo.list_aliases([wt.id for wt in active])
-        candidates: list[WorkTypeCandidate] = []
-        for work_type in active:
-            own = [a for a in aliases if a.work_type_id == work_type.id]
-            bags = [frozenset(tokenise(a.alias)) for a in own]
-            bags.append(tokenise(work_type.embedding_text()))
-            candidates.append(
-                WorkTypeCandidate(
-                    work_type_id=work_type.id,
-                    code=work_type.code,
-                    aliases=frozenset(a.normalised for a in own),
-                    token_bags=tuple(bag for bag in bags if bag),
-                    semantic_score=None,
-                )
-            )
-        return candidates
+        return await self._tagger.candidates()
 
     # --- audit --------------------------------------------------------------
 
@@ -340,6 +283,8 @@ class ProjectImportService:
                     "files_failed": result.files_failed,
                     "work_types_linked": result.work_types_linked,
                     "eligibility_visible": result.eligibility_visible,
+                    "taxonomy_work_types": result.taxonomy_work_types,
+                    "taxonomy_provisioned": result.taxonomy_provisioned,
                 },
             )
         )

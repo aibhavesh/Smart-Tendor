@@ -22,7 +22,12 @@ class PlatformStats:
 @dataclass(frozen=True, slots=True)
 class ComponentStatus:
     name: str
-    status: str  # "ok" | "error"
+    #: "ok" | "warning" | "error". Only "error" makes ``SystemHealth.healthy``
+    #: false: that flag means the infrastructure is reachable, while a warning
+    #: means it is reachable but misconfigured. An empty work-type taxonomy is the
+    #: canonical warning — the API answers every request perfectly while stage A
+    #: matches nothing and every tender screens INDETERMINATE.
+    status: str
     detail: str | None = None
 
 

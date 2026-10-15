@@ -52,6 +52,8 @@ const T = {
   goInk: "#065f46",
   danger: "#dc2626",
   dangerInk: "#b91c1c",
+  warn: "#d97706",
+  warnInk: "#92400e",
   violet: "#9333ea",
   violetDeep: "#7e22ce",
   white: "#ffffff",
@@ -74,6 +76,7 @@ const D = {
   brandInk: "#6cb8ff",
   goInk: "#34d399",
   dangerInk: "#f87171",
+  warnInk: "#fbbf24",
 };
 
 // [label, foreground, background, threshold, required]
@@ -94,6 +97,8 @@ const PAIRS = [
   ["white on danger — VerdictBadge NO_BID", T.white, T.danger, 4.5, true],
   ["go-ink on canvas", T.goInk, T.canvas, 4.5, true],
   ["danger-ink on canvas", T.dangerInk, T.canvas, 4.5, true],
+  ["warn-ink on canvas — configuration warning", T.warnInk, T.canvas, 4.5, true],
+  ["white on warn-ink — warning badge", T.white, T.warnInk, 4.5, true],
   ["ink-muted on canvas — RiskBadge NONE", T.inkMuted, T.canvas, 4.5, true],
 
   ["white on accent-violet-deep", T.white, T.violetDeep, 4.5, true],
@@ -110,6 +115,7 @@ const PAIRS = [
   ["dark: brand-ink on canvas — links", D.brandInk, D.canvas, 4.5, true],
   ["dark: go-ink on canvas", D.goInk, D.canvas, 4.5, true],
   ["dark: danger-ink on canvas", D.dangerInk, D.canvas, 4.5, true],
+  ["dark: warn-ink on canvas", D.warnInk, D.canvas, 4.5, true],
   ["dark: ink-muted on canvas — RiskBadge NONE", D.inkMuted, D.canvas, 4.5, true],
   ["dark: brand as decorative icon on canvas (3:1 graphics)", D.brand, D.canvas, 3.0, false],
 ];

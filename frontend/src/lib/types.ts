@@ -166,6 +166,14 @@ export interface ProjectImportResult {
   files_failed: number;
   work_types_linked: number;
   eligibility_visible: number;
+  /**
+   * Work types available to match against during this import. Zero means the
+   * taxonomy was empty, so nothing could be tagged — a system fault, not a fault
+   * in the uploaded rows.
+   */
+  taxonomy_work_types: number;
+  /** Work types this import created first, because the taxonomy was missing. */
+  taxonomy_provisioned: number;
   files: ProjectImportFile[];
 }
 

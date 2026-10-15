@@ -45,7 +45,7 @@ from tender_intel.domain.interfaces.repositories import (
 )
 from tender_intel.domain.value_objects.pagination import MAX_LIMIT, PageRequest
 from tender_intel.infrastructure.observability.logging import get_logger
-from tender_intel.infrastructure.seed.work_type_seed import WorkTypeSeed
+from tender_intel.infrastructure.seed.work_type_seed import WorkTypeSeed, load_packaged_seed
 
 _log = get_logger(__name__)
 
@@ -164,9 +164,9 @@ class WorkTypeSeedService:
         by_code: dict[str, UUID] = {}
 
         for entry in seed.work_types:
-            existing = await self._work_types.get_by_code(entry.code)
-            if existing is None:
-                created = await self._work_types.add(
+            work_type = await self._work_types.get_by_code(entry.code)
+            if work_type is None:
+                work_type = await self._work_types.add_ignoring_conflict(
                     WorkType(
                         code=entry.code,
                         name=entry.name,
@@ -174,20 +174,23 @@ class WorkTypeSeedService:
                         description=entry.description,
                     )
                 )
-                by_code[entry.code] = created.id
-                outcome.work_types_created += 1
-            else:
-                by_code[entry.code] = existing.id
+                if work_type is None:
+                    # Lost a race with a concurrent provisioner; adopt its row.
+                    work_type = await self._work_types.get_by_code(entry.code)
+                else:
+                    outcome.work_types_created += 1
+            if work_type is None:  # pragma: no cover - the winner committed its row
+                continue
+            by_code[entry.code] = work_type.id
 
             for alias in entry.aliases:
                 if await self._work_types.find_alias(alias.normalised) is not None:
                     continue
-                await self._work_types.add_alias(
-                    WorkTypeAlias(
-                        work_type_id=by_code[entry.code], alias=alias.alias, kind=alias.kind
-                    )
+                added = await self._work_types.add_alias_ignoring_conflict(
+                    WorkTypeAlias(work_type_id=work_type.id, alias=alias.alias, kind=alias.kind)
                 )
-                outcome.aliases_created += 1
+                if added is not None:
+                    outcome.aliases_created += 1
 
         if not types_only:
             by_key = await self._projects_by_loa()
@@ -227,6 +230,41 @@ class WorkTypeSeedService:
             work_types=outcome.work_types_created,
             aliases=outcome.aliases_created,
             tags=outcome.tags_created,
+        )
+        return outcome
+
+    # ------------------------------------------------------------------ #
+    async def ensure_taxonomy(self, *, actor_id: UUID | None = None) -> SeedOutcome | None:
+        """Load types and aliases when the taxonomy is empty. Returns None otherwise.
+
+        This exists because a database created from migrations alone has the
+        ``work_types`` *tables* and none of their rows, and nothing else in the
+        system creates them. Stage A then has no candidates and stage B has no
+        links, so every tender screens ``INDETERMINATE`` — which reads as "awaiting
+        a human" rather than "never configured".
+
+        The fast path is one query, because this is called on the project-write
+        path and must not cost anything once the taxonomy exists.
+
+        Only ever called with ``types_only``: project links are derived state that
+        belongs to the portfolio, and reconciling LOA references here would abort
+        the whole call on a single unresolvable reference. Tagging existing
+        projects is ``scripts/backfill_work_type_tags.py``.
+
+        The audit entry carries a **null actor**. The acting user did not create 40
+        work types — the system did, on their behalf — and attributing it to them
+        would put a false entry in the trail. This mirrors the bootstrap migration,
+        which also records a system act with no actor.
+        """
+        if await self._work_types.list_active():
+            return None
+
+        _log.info("work_type.taxonomy_empty_provisioning")
+        outcome = await self.load(load_packaged_seed(), actor_id=None, types_only=True)
+        _log.info(
+            "work_type.taxonomy_provisioned",
+            work_types=outcome.work_types_created,
+            aliases=outcome.aliases_created,
         )
         return outcome
 

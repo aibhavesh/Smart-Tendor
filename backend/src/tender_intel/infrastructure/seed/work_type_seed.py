@@ -24,6 +24,13 @@ from tender_intel.domain.decision.normalise import normalise_alias
 from tender_intel.domain.enums.work_type import AliasKind, WorkTypeCategory
 from tender_intel.domain.exceptions import DomainValidationError
 
+#: The seed ships inside the package, not at the repository root, so that it is
+#: present wherever ``tender_intel`` is installed. Root-level placement worked only
+#: for a checkout: the backend Docker build context is ``./backend``, so a file
+#: above it never reached the image and the running container had nothing to load.
+SEED_DATA_DIR = Path(__file__).resolve().parent / "data"
+PACKAGED_SEED = SEED_DATA_DIR / "work_types_seed.json"
+
 
 class SeedValidationError(DomainValidationError):
     """The seed file is not loadable. Carries every problem found."""
@@ -104,6 +111,16 @@ def load_seed_file(path: Path) -> WorkTypeSeed:
     except json.JSONDecodeError as exc:
         raise SeedValidationError([f"seed file is not valid JSON: {exc}"]) from exc
     return parse_seed(payload)
+
+
+def load_packaged_seed() -> WorkTypeSeed:
+    """Read the seed file that ships with the package.
+
+    The single source of truth for automatic provisioning. Separate from
+    ``load_seed_file`` so an operator passing an explicit ``--seed`` is still
+    loading *their* file, not this one by accident.
+    """
+    return load_seed_file(PACKAGED_SEED)
 
 
 def parse_seed(payload: Any) -> WorkTypeSeed:

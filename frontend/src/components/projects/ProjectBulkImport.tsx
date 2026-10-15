@@ -138,6 +138,14 @@ export function ProjectBulkImport({
   }
 
   const notCounted = result ? result.created - result.eligibility_visible : 0;
+  /**
+   * The taxonomy was empty, so there was nothing to match against. This is a
+   * system fault rather than a property of the uploaded rows, and it is stated
+   * separately for that reason: the per-row "no work-type match" below reads as
+   * a problem with the spreadsheet, and sends an operator to edit rows that are
+   * perfectly fine.
+   */
+  const taxonomyWasMissing = result !== null && result.taxonomy_work_types === 0;
 
   return (
     <Card className="w-full">
@@ -170,7 +178,12 @@ export function ProjectBulkImport({
             {" - "}<span className={result.errors > 0 ? "font-semibold text-state-danger-ink" : "text-ink-muted"}>{result.errors} errored</span>
             {" - "}<span className="text-ink-muted">{result.work_types_linked} work-type links</span>
           </p>
-          {notCounted > 0 ? (
+          {taxonomyWasMissing ? (
+            <p className="mt-3 flex items-start gap-2 rounded-control border border-state-danger/30 bg-state-danger/10 px-3 py-2 text-caption text-state-danger-ink">
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <span><span className="font-semibold">No work types are configured, so nothing could be matched.</span> This is not a problem with your workbook. Until the work-type taxonomy exists, eligibility screening returns INDETERMINATE for every tender. An administrator can load it from Administration.</span>
+            </p>
+          ) : notCounted > 0 ? (
             <p className="mt-3 flex items-start gap-2 rounded-control border border-state-danger/30 bg-state-danger/10 px-3 py-2 text-caption text-state-danger-ink">
               <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
               <span><span className="font-semibold">{notCounted} of {result.created} imported project{result.created === 1 ? "" : "s"} will not count towards eligibility.</span> The rows below name the missing evidence.</span>

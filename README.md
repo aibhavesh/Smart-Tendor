@@ -181,6 +181,59 @@ digest**, never stored as a flag, so no code path has to remember to clear it.
 only: nothing is recomputed, invalidated or hidden, and the recorded result stays
 readable until it is replaced by a fresh screening.
 
+### The work-type taxonomy
+
+Stage A matches a tender's scope against a taxonomy of work types, and stage B
+scores past projects that carry a work-type link. **A database created from
+migrations alone has the `work_types` tables and none of their rows** — the
+migration creates the schema, and no migration or startup step populates it.
+
+Left unaddressed, that is a silent failure: the API answers normally, projects
+import and index successfully, and every tender screens `INDETERMINATE`, which
+reads as "awaiting a human" rather than "never configured".
+
+It is now self-provisioning. `WorkTypeSeedService.ensure_taxonomy` loads the
+packaged taxonomy when it finds the table empty, and runs on the first past-project
+write — both the single-create path and the bulk import, before the import builds
+its candidate set. It is idempotent, and safe against concurrent instances: a lost
+uniqueness race is treated as success via a savepoint rather than an error.
+
+`GET /admin/system-health` reports `work_type_taxonomy` as `warning` while it is
+empty. The flag stays green, because infrastructure is reachable; only `error`
+clears `healthy`.
+
+#### Loading it explicitly
+
+```bash
+cd backend
+python scripts/load_work_types.py --types-only --dry-run   # report, write nothing
+python scripts/load_work_types.py --types-only             # 40 types, 131 aliases
+```
+
+The seed lives at
+`backend/src/tender_intel/infrastructure/seed/data/work_types_seed.json`, inside
+the package, so it is present in the built image and reachable from a running
+container.
+
+`--types-only` matters: the full run reconciles every LOA reference against
+`past_projects.loa_reference` and **aborts** on the first one it cannot resolve.
+
+#### Backfilling links on existing projects
+
+Links are written at import time. Projects imported while the taxonomy was empty
+have none, and **re-importing does not fix it** — `_import_row` matches on the LOA
+reference and returns `SKIPPED` before reaching the tagging step.
+
+```bash
+python scripts/backfill_work_type_tags.py --dry-run    # always read this first
+python scripts/backfill_work_type_tags.py --apply
+```
+
+It reads existing projects and links them through the same `WorkTypeTagger` the
+importer uses, so a backfilled link is indistinguishable from an imported one. It
+cannot create projects, so it cannot duplicate them. `--apply` bumps the
+portfolio counter once, which makes existing screening results report stale.
+
 ### Human review
 
 There is no review queue and no verdict workflow. A screening result is read and
@@ -405,8 +458,8 @@ asyncpg scheme at startup.
 ```bash
 # Backend — from backend/
 pytest                    # no live database needed; integration tests use in-memory SQLite
-ruff check src tests
-ruff format --check src tests
+ruff check src tests scripts
+ruff format --check src tests scripts
 mypy src                  # strict
 
 # Frontend — from frontend/
@@ -415,7 +468,7 @@ npm run typecheck
 npm run build
 ```
 
-555 tests pass. CI
+591 tests pass. CI
 ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs exactly these on
 every push to `main` and every pull request, plus a third job that applies the
 whole Alembic chain to an empty PostgreSQL database and asserts `audit_logs`
@@ -517,6 +570,19 @@ demonstration topology, not a production SLA.
 API filesystem. On a free Render service those files disappear on restart,
 redeploy or spin-down. Rows remain in Neon and vectors in Qdrant, but file
 durability needs a paid persistent disk or a future object-storage adapter.
+
+### Post-deploy verification
+
+A freshly provisioned database has no work-type taxonomy until something writes
+a past project. Confirm it is populated before trusting any screening result:
+
+```bash
+docker compose run --rm backend python scripts/load_work_types.py --types-only --dry-run
+docker compose exec backend python scripts/backfill_work_type_tags.py --dry-run
+```
+
+`GET /admin/system-health` reports `work_type_taxonomy` as `warning` while it is
+empty, which is the check that does not require the shell.
 
 ### Rollback
 

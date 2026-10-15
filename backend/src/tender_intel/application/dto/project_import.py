@@ -78,6 +78,14 @@ class ProjectImportResult:
     """The whole batch."""
 
     files: list[FileImportResult] = field(default_factory=list)
+    #: Work types available to match against when this batch ran. Zero means the
+    #: taxonomy was empty, so every row below was tagged zero times — which is a
+    #: system configuration fact, not a property of any individual project, and is
+    #: reported separately so the UI can say so instead of blaming the rows.
+    taxonomy_work_types: int = 0
+    #: Work types this batch had to create first. Non-zero means the taxonomy was
+    #: missing and has just been provisioned.
+    taxonomy_provisioned: int = 0
 
     @property
     def created(self) -> int:

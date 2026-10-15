@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from tender_intel.application.dto.past_project import PastProjectCreate, PastProjectPatch
+from tender_intel.application.services.work_type_seed_service import WorkTypeSeedService
 from tender_intel.domain.entities import AuditLog, PastProject
 from tender_intel.domain.exceptions import EntityNotFoundError
 from tender_intel.domain.interfaces.providers import EmbeddingProvider, VectorStore
@@ -46,14 +47,23 @@ class PastProjectService:
         embeddings: EmbeddingProvider,
         vectors: VectorStore,
         collection: str,
+        seed: WorkTypeSeedService | None = None,
     ) -> None:
         self._projects = projects
         self._audits = audits
         self._embeddings = embeddings
         self._vectors = vectors
         self._collection = collection
+        self._seed = seed
 
     async def create(self, data: PastProjectCreate, *, actor_id: UUID | None = None) -> PastProject:
+        # Provision the taxonomy on the way in. Without it a database built from
+        # migrations alone accepts projects that stage B can never count, because
+        # there is no work-type list to link them to — and nothing reports that.
+        # Bulk import also calls this, once per row; the check is a single indexed
+        # query that returns immediately once the taxonomy exists.
+        if self._seed is not None:
+            await self._seed.ensure_taxonomy()
         project = PastProject(
             name=data.name,
             client=data.client,

@@ -81,6 +81,95 @@ async def audit_actions(app, action: str):
         return [a for a in page.items if a.action == action]
 
 
+async def work_type_count(app) -> int:
+    factory = app.state.test_session_factory
+    async with factory() as session:
+        return len(await SqlAlchemyWorkTypeRepository(session).list_active())
+
+
+# --- taxonomy provisioning on the import path ------------------------------
+
+
+async def test_import_provisions_an_empty_taxonomy_and_tags_from_it(client, app_db):
+    """The reported bug, as a test.
+
+    A database from migrations alone has zero work types. Importing against that
+    used to create every project, tag none of them, and report full success. The
+    taxonomy is now provisioned first, in the same request, so the very first
+    import already produces links.
+    """
+    headers = await auth_headers(client, app_db)
+    assert await work_type_count(app_db) == 0
+
+    content = workbook_bytes(
+        [
+            {
+                "name": "Supply and laying of optical fibre cable",
+                "value": "1,13,00,000",
+                "certificate": "2024-03-31",
+            }
+        ]
+    )
+    resp = await client.post(
+        IMPORT_URL,
+        headers=headers,
+        files={"files": ("portfolio.xlsx", content, "application/vnd.ms-excel")},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+
+    assert await work_type_count(app_db) > 0
+    assert body["taxonomy_provisioned"] > 0
+    assert body["taxonomy_work_types"] > 0
+    # The decisive assertion: links exist, so stage B can see this project.
+    assert body["work_types_linked"] > 0
+    assert await list_tags(app_db)
+
+
+async def test_import_reports_the_taxonomy_rather_than_blaming_the_rows(client, app_db):
+    """A system fault is reported as a system fact.
+
+    The row-level report says "no work-type match", which reads as a property of
+    the uploaded row. The batch-level counters say the taxonomy itself was empty,
+    which is the thing an operator has to fix.
+    """
+    headers = await auth_headers(client, app_db)
+    content = workbook_bytes([{"name": "Something entirely unmatched", "value": "1,00,000"}])
+    resp = await client.post(
+        IMPORT_URL,
+        headers=headers,
+        files={"files": ("p.xlsx", content, "application/vnd.ms-excel")},
+    )
+    body = resp.json()
+
+    assert body["taxonomy_work_types"] > 0
+    assert body["taxonomy_provisioned"] > 0
+
+
+async def test_import_does_not_reprovision_a_populated_taxonomy(client, app_db):
+    """Provisioned once. A second import must not re-run the seed."""
+    headers = await auth_headers(client, app_db)
+    content = workbook_bytes(
+        [{"name": "OFC laying", "value": "1,00,000", "certificate": "2024-03-31"}]
+    )
+    await client.post(
+        IMPORT_URL,
+        headers=headers,
+        files={"files": ("a.xlsx", content, "application/vnd.ms-excel")},
+    )
+    after_first = await work_type_count(app_db)
+
+    resp = await client.post(
+        IMPORT_URL,
+        headers=headers,
+        files={"files": ("b.xlsx", content, "application/vnd.ms-excel")},
+    )
+    body = resp.json()
+
+    assert body["taxonomy_provisioned"] == 0
+    assert await work_type_count(app_db) == after_first
+
+
 # --- the happy path -------------------------------------------------------
 
 

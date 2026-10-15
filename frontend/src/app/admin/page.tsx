@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { RequireAuth } from "@/components/layout/RequireAuth";
+import { SystemConfigurationHealth } from "@/components/admin/SystemConfigurationHealth";
 import { TenderRetirement } from "@/components/admin/TenderRetirement";
 import { UserRoleControl } from "@/components/admin/UserRoleControl";
 import { Card, CardHeader } from "@/components/ui/Card";
@@ -118,6 +119,7 @@ function Administration() {
           . That list is read once when an account is created and never again.
         </p>
       </Card>
+      <SystemConfigurationHealth />
       <TenderRetirement />
     </div>
   );

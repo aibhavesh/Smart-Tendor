@@ -17,6 +17,7 @@ from tender_intel.application.dto.admin import (
 )
 from tender_intel.application.dto.stats import OperationalStats
 from tender_intel.domain.interfaces.providers import VectorStore
+from tender_intel.domain.interfaces.repositories import WorkTypeRepository
 from tender_intel.infrastructure.observability.telemetry import collect_request_samples
 from tender_intel.infrastructure.repositories.stats_repo import SqlAlchemyStatsRepository
 
@@ -31,10 +32,12 @@ class PlatformService:
         stats: SqlAlchemyStatsRepository,
         session: AsyncSession,
         vectors: VectorStore,
+        work_types: WorkTypeRepository,
     ) -> None:
         self._stats = stats
         self._session = session
         self._vectors = vectors
+        self._work_types = work_types
 
     async def platform_stats(self) -> PlatformStats:
         return await self._stats.platform_stats()
@@ -43,8 +46,12 @@ class PlatformService:
         return await self._stats.operational_stats()
 
     async def system_health(self) -> SystemHealth:
-        components = [await self._database_status(), await self._vector_status()]
-        healthy = all(c.status == "ok" for c in components)
+        components = [
+            await self._database_status(),
+            await self._vector_status(),
+            await self._taxonomy_status(),
+        ]
+        healthy = all(c.status != "error" for c in components)
         return SystemHealth(healthy=healthy, components=components, host=self._host_resources())
 
     def api_usage(self) -> ApiUsage:
@@ -74,6 +81,31 @@ class PlatformService:
     async def _vector_status(self) -> ComponentStatus:
         ok = await self._vectors.health()
         return ComponentStatus("vector_store", "ok" if ok else "error")
+
+    async def _taxonomy_status(self) -> ComponentStatus:
+        """Warn when the work-type taxonomy is empty.
+
+        Every other signal in this response stays green while this one is wrong.
+        The API serves requests normally, the database is reachable, the vector
+        store answers — and stage A has no candidates to match, so every tender
+        screens INDETERMINATE and reads as "awaiting a human" rather than "never
+        configured". Migrations create the taxonomy's tables but none of its rows.
+
+        Self-healing on the next past-project write via ``ensure_taxonomy``; a
+        deployment that never adds one keeps this warning until it does.
+        """
+        try:
+            active = await self._work_types.list_active()
+        except Exception as exc:
+            return ComponentStatus("work_type_taxonomy", "error", str(exc))
+        if not active:
+            return ComponentStatus(
+                "work_type_taxonomy",
+                "warning",
+                "no work types configured; eligibility screening will return "
+                "INDETERMINATE until the taxonomy is provisioned",
+            )
+        return ComponentStatus("work_type_taxonomy", "ok", f"{len(active)} active work types")
 
     @staticmethod
     def _host_resources() -> HostResources:

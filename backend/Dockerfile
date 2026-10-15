@@ -17,6 +17,11 @@ RUN pip install --upgrade pip && pip install .
 
 COPY alembic.ini ./
 COPY alembic ./alembic
+# Operator scripts. The image is the only place they can now run: a deployed
+# database is reachable over the network but its host filesystem is not, so
+# `backfill_work_type_tags.py` and `load_work_types.py` are executed from here.
+# The seed they read ships inside the package, so nothing else needs copying in.
+COPY scripts ./scripts
 
 RUN groupadd --gid 10001 app \
     && useradd --uid 10001 --gid app --create-home --shell /usr/sbin/nologin app \

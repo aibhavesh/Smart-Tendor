@@ -43,6 +43,7 @@ from tender_intel.application.services.project_import_service import ProjectImpo
 from tender_intel.application.services.retirement_service import TenderRetirementService
 from tender_intel.application.services.tender_service import TenderService
 from tender_intel.application.services.turnover_import_service import TurnoverImportService
+from tender_intel.application.services.work_type_seed_service import WorkTypeSeedService
 from tender_intel.application.services.work_type_service import WorkTypeService
 from tender_intel.core.config import Settings
 from tender_intel.domain.interfaces.providers import (
@@ -160,12 +161,25 @@ def get_extraction_service(
     )
 
 
+def get_work_type_seed_service(
+    work_types: SqlAlchemyWorkTypeRepository = Depends(get_work_type_repo),
+    projects: SqlAlchemyPastProjectRepository = Depends(get_past_project_repo),
+    versions: SqlAlchemyPortfolioVersionRepository = Depends(get_portfolio_version_repo),
+    audits: AuditLogRepository = Depends(get_audit_repo),
+) -> WorkTypeSeedService:
+    """Declared above its first use: ``Depends`` resolves the callable at import."""
+    return WorkTypeSeedService(
+        work_types=work_types, projects=projects, versions=versions, audits=audits
+    )
+
+
 def get_past_project_service(
     projects: SqlAlchemyPastProjectRepository = Depends(get_past_project_repo),
     audits: AuditLogRepository = Depends(get_audit_repo),
     embeddings: EmbeddingProvider = Depends(get_embedding_provider),
     vectors: VectorStore = Depends(get_vector_store),
     settings: Settings = Depends(get_app_settings),
+    seed: WorkTypeSeedService = Depends(get_work_type_seed_service),
 ) -> PastProjectService:
     return PastProjectService(
         projects=projects,
@@ -173,6 +187,7 @@ def get_past_project_service(
         embeddings=embeddings,
         vectors=vectors,
         collection=settings.qdrant_collection,
+        seed=seed,
     )
 
 
@@ -221,6 +236,7 @@ def get_project_import_service(
     work_type_repo: SqlAlchemyWorkTypeRepository = Depends(get_work_type_repo),
     project_repo: SqlAlchemyPastProjectRepository = Depends(get_past_project_repo),
     audits: AuditLogRepository = Depends(get_audit_repo),
+    seed: WorkTypeSeedService = Depends(get_work_type_seed_service),
 ) -> ProjectImportService:
     return ProjectImportService(
         projects=projects,
@@ -228,6 +244,7 @@ def get_project_import_service(
         work_type_repo=work_type_repo,
         project_repo=project_repo,
         audits=audits,
+        seed=seed,
     )
 
 
@@ -275,5 +292,6 @@ def get_platform_service(
     stats: SqlAlchemyStatsRepository = Depends(get_stats_repo),
     session: AsyncSession = Depends(get_session),
     vectors: VectorStore = Depends(get_vector_store),
+    work_types: SqlAlchemyWorkTypeRepository = Depends(get_work_type_repo),
 ) -> PlatformService:
-    return PlatformService(stats=stats, session=session, vectors=vectors)
+    return PlatformService(stats=stats, session=session, vectors=vectors, work_types=work_types)

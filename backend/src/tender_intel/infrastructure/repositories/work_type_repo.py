@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from sqlalchemy import delete, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tender_intel.domain.entities.work_type import (
@@ -40,6 +41,30 @@ class SqlAlchemyWorkTypeRepository:
         await self._session.flush()
         await self._session.refresh(model)
         return mappers.work_type_to_domain(model)
+
+    async def add_ignoring_conflict(self, work_type: WorkType) -> WorkType | None:
+        """Insert, or return ``None`` when the unique ``code`` is already taken.
+
+        Returns ``None`` rather than raising because the caller is a concurrent
+        provisioner: two application instances can both find the taxonomy empty
+        and both try to seed it, and exactly one of them should win. The loser
+        re-reads by code and carries on, which is what makes
+        ``ensure_taxonomy`` safe to run without a lock.
+
+        The SAVEPOINT is what keeps that safe. A bare ``IntegrityError`` would
+        leave the session in a failed state and a rollback would discard every
+        type this call had already written; rolling back to a nested point
+        discards only the losing row.
+        """
+        try:
+            async with self._session.begin_nested():
+                model = mappers.work_type_to_model(work_type)
+                self._session.add(model)
+                await self._session.flush()
+                await self._session.refresh(model)
+                return mappers.work_type_to_domain(model)
+        except IntegrityError:
+            return None
 
     async def get(self, work_type_id: UUID) -> WorkType | None:
         model = await self._session.get(WorkTypeModel, work_type_id)
@@ -77,6 +102,27 @@ class SqlAlchemyWorkTypeRepository:
         self._session.add(model)
         await self._session.flush()
         return mappers.alias_to_domain(model)
+
+    async def add_alias_ignoring_conflict(self, alias: WorkTypeAlias) -> WorkTypeAlias | None:
+        """Insert, or return ``None`` when the alias is already claimed.
+
+        ``alias_normalised`` is unique **globally** rather than per work type, so a
+        collision means some other type already owns that phrase — either because
+        an operator added it by hand through the admin API, or because a concurrent
+        provisioner inserted it first. Both are legitimate states, so the existing
+        owner is kept and the seed's duplicate is dropped. Overwriting an
+        operator's alias with a seed alias would silently retarget it.
+
+        Savepoint for the same reason as :meth:`add_ignoring_conflict`.
+        """
+        try:
+            async with self._session.begin_nested():
+                model = mappers.alias_to_model(alias)
+                self._session.add(model)
+                await self._session.flush()
+                return mappers.alias_to_domain(model)
+        except IntegrityError:
+            return None
 
     async def get_alias(self, alias_id: UUID) -> WorkTypeAlias | None:
         model = await self._session.get(WorkTypeAliasModel, alias_id)

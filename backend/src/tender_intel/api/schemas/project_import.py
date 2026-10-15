@@ -73,6 +73,12 @@ class ProjectImportResponse(BaseModel):
     work_types_linked: int
     #: How many of the created projects will actually count as stage B evidence.
     eligibility_visible: int
+    #: Work types available to match against during this batch. Zero means the
+    #: taxonomy was empty and nothing could be tagged — a system fault, not a
+    #: fault in the uploaded rows.
+    taxonomy_work_types: int
+    #: Work types this batch created first, because the taxonomy was missing.
+    taxonomy_provisioned: int
     files: list[ProjectImportFileResponse]
 
     @classmethod
@@ -84,5 +90,7 @@ class ProjectImportResponse(BaseModel):
             files_failed=result.files_failed,
             work_types_linked=result.work_types_linked,
             eligibility_visible=result.eligibility_visible,
+            taxonomy_work_types=result.taxonomy_work_types,
+            taxonomy_provisioned=result.taxonomy_provisioned,
             files=[ProjectImportFileResponse.from_dto(f) for f in result.files],
         )
