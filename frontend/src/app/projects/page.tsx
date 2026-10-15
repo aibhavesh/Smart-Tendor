@@ -20,6 +20,55 @@ import type { Page, PastProject } from "@/lib/types";
 
 const LIMIT = 20;
 
+/**
+ * Whether a past project can count as eligibility evidence.
+ *
+ * Driven by `completion_certificate_date`, not `completion_date`. The two are
+ * different columns and only the certificate gates stage B: a project with a
+ * completion date but no certificate date is still invisible to every screening
+ * run. Showing the plain completion date here would have said "not completed" for
+ * projects that are, which is how 29 of 31 rows came to display an em dash.
+ *
+ * The three states are kept distinct because they call for different actions:
+ *
+ *   - certificated — counts as evidence, so this is the good case
+ *   - a note but no date — the workbook said the work is unfinished ("Running"),
+ *     which is a correct exclusion and nothing to fix
+ *   - neither — a gap in the source data, and the only state worth chasing
+ */
+function CompletionStatus({ project }: { project: PastProject }) {
+  const certificated = formatDate(project.completion_certificate_date);
+
+  if (certificated) {
+    return (
+      <span className="inline-flex items-baseline gap-2">
+        <span className="text-caption font-semibold text-state-go-ink">Completed</span>
+        <span className="text-caption text-ink-muted">{certificated}</span>
+      </span>
+    );
+  }
+
+  if (project.completion_certificate_note) {
+    return (
+      <span
+        className="inline-flex items-baseline gap-2"
+        title="Work not finished, so this project cannot count as evidence yet"
+      >
+        <span className="text-caption font-semibold text-state-warn-ink">Running</span>
+        <span className="text-caption text-ink-muted">
+          {project.completion_certificate_note}
+        </span>
+      </span>
+    );
+  }
+
+  return (
+    <span title="No completion certificate recorded, so this project cannot count as evidence">
+      <UnknownValue label="NO CERTIFICATE" />
+    </span>
+  );
+}
+
 function EditProject({
   project,
   onDone,
@@ -33,6 +82,7 @@ function EditProject({
   const [client, setClient] = useState(project.client ?? "");
   const [value, setValue] = useState(project.work_value ?? "");
   const [completion, setCompletion] = useState(project.completion_date ?? "");
+  const [certificate, setCertificate] = useState(project.completion_certificate_date ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,6 +96,7 @@ function EditProject({
         client: client || null,
         work_value: value || null,
         completion_date: completion || null,
+        completion_certificate_date: certificate || null,
       });
       onDone();
     } catch (err) {
@@ -59,7 +110,7 @@ function EditProject({
     <Card>
       <CardHeader
         title={`Edit ${project.name}`}
-        description="Changing the work value can change which tenders this project qualifies."
+        description="Changing the work value or the completion certificate can change which tenders this project qualifies."
       />
       <form onSubmit={save} className="flex flex-col gap-3">
         {error ? (
@@ -70,11 +121,27 @@ function EditProject({
             {error}
           </p>
         ) : null}
+        {/* The status column reports ineligibility in terms of the certificate
+            date, so the fix has to be reachable here. Without this field the
+            badge could tell a user their project was invisible but not let them
+            correct it. */}
+        {!project.completion_certificate_date ? (
+          <p className="rounded-control border border-ink-strong/15 bg-surface/60 px-3 py-2.5 text-caption text-ink-muted">
+            {project.completion_certificate_note
+              ? `This project cannot count towards eligibility: the workbook recorded "${project.completion_certificate_note}" instead of a date. Set a completion certificate date once the work is finished.`
+              : "This project cannot count towards eligibility because it has no completion certificate date. Add one to make it count as evidence."}
+          </p>
+        ) : null}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <TextField label="Name" required maxLength={1024} value={name} onChange={(e) => setName(e.target.value)} />
           <TextField label="Client" value={client} onChange={(e) => setClient(e.target.value)} />
           <TextField label="Work value" inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} />
           <DateField label="Completion date" value={completion} onChange={(e) => setCompletion(e.target.value)} />
+          <DateField
+            label="Completion certificate date"
+            value={certificate}
+            onChange={(e) => setCertificate(e.target.value)}
+          />
         </div>
         <div className="flex items-center gap-2">
           <Button type="submit" size="sm" disabled={busy}>
@@ -216,9 +283,8 @@ function ProjectsBody() {
             <Table>
               <THead>
                 <TH>Name</TH>
-                <TH>Client</TH>
                 <TH>Value</TH>
-                <TH>Completed</TH>
+                <TH>Status</TH>
                 <TH>Indexed</TH>
                 {canWrite ? <TH /> : null}
               </THead>
@@ -226,10 +292,9 @@ function ProjectsBody() {
                 {page.data.items.map((p) => (
                   <TR key={p.id}>
                     <TD className="max-w-[34ch] truncate">{p.name}</TD>
-                    <TD className="text-caption text-ink-muted">{p.client ?? "—"}</TD>
                     <TD className="whitespace-nowrap">{formatMoney(p.work_value) ?? "—"}</TD>
-                    <TD className="text-caption text-ink-muted whitespace-nowrap">
-                      {formatDate(p.completion_date) ?? "—"}
+                    <TD className="whitespace-nowrap">
+                      <CompletionStatus project={p} />
                     </TD>
                     <TD>
                       {p.embedding_indexed ? (

@@ -381,7 +381,17 @@ export interface PastProject {
   category: string | null;
   location: string | null;
   description: string | null;
+  /**
+   * The date the work was completed. Distinct from
+   * `completion_certificate_date`, which is what the eligibility engine's stage B
+   * actually gates on — a project with a completion date but no certificate is
+   * still invisible to screening.
+   */
   completion_date: string | null;
+  /** The certificate date. Null means the project cannot count as evidence. */
+  completion_certificate_date: string | null;
+  /** Why there is no certificate date, e.g. "Running" for unfinished work. */
+  completion_certificate_note: string | null;
   embedding_indexed: boolean;
   created_at: string;
 }
